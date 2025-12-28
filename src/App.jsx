@@ -94,10 +94,7 @@ function extFromMime(mime = "") {
  */
 function normalizeBlobWithType(fileOrBlob, preferredType = "") {
   if (!fileOrBlob) return null;
-  const type =
-    (fileOrBlob && fileOrBlob.type) ||
-    preferredType ||
-    "application/octet-stream";
+  const type = (fileOrBlob && fileOrBlob.type) || preferredType || "application/octet-stream";
   // 用 new Blob([...]) 强制把 type 固定下来
   return new Blob([fileOrBlob], { type });
 }
@@ -124,6 +121,61 @@ async function setImageToIdbWithKey(key, blob, preferredType = "") {
 async function deleteImageFromIdb(key) {
   if (!key) return;
   await idbDel(key);
+}
+
+/* ---------------- PWA：安装提示 Hook（新增） ---------------- */
+
+function usePwaInstall() {
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [isStandalone, setIsStandalone] = useState(false);
+  const [justInstalled, setJustInstalled] = useState(false);
+
+  useEffect(() => {
+    const checkStandalone = () => {
+      const standalone =
+        window.matchMedia?.("(display-mode: standalone)")?.matches ||
+        // iOS Safari 兼容（不影响安卓）
+        window.navigator.standalone === true;
+      setIsStandalone(!!standalone);
+    };
+
+    checkStandalone();
+
+    const onBeforeInstallPrompt = (e) => {
+      // 阻止浏览器默认提示，让我们自己显示“安装到桌面”按钮
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+
+    const onAppInstalled = () => {
+      setDeferredPrompt(null);
+      setJustInstalled(true);
+      setTimeout(checkStandalone, 300);
+      setTimeout(() => setJustInstalled(false), 3000);
+    };
+
+    window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+    window.addEventListener("appinstalled", onAppInstalled);
+    document.addEventListener("visibilitychange", checkStandalone);
+
+    return () => {
+      window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+      window.removeEventListener("appinstalled", onAppInstalled);
+      document.removeEventListener("visibilitychange", checkStandalone);
+    };
+  }, []);
+
+  const promptInstall = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    try {
+      await deferredPrompt.userChoice;
+    } finally {
+      setDeferredPrompt(null);
+    }
+  };
+
+  return { deferredPrompt, isStandalone, justInstalled, promptInstall };
 }
 
 /* ---------------- UI 组件 ---------------- */
@@ -198,6 +250,9 @@ export default function App() {
   const [showAddPlant, setShowAddPlant] = useState(false);
   const [showAddEvent, setShowAddEvent] = useState(false);
   const [showDataPanel, setShowDataPanel] = useState(false);
+
+  // ✅ PWA 安装提示（新增）
+  const { deferredPrompt, isStandalone, justInstalled, promptInstall } = usePwaInstall();
 
   const [urlCache, setUrlCache] = useState({});
   const urlCacheRef = useRef({});
@@ -448,6 +503,31 @@ export default function App() {
       </header>
 
       <main className="mx-auto max-w-6xl p-4">
+        {/* ✅ PWA 安装提示条（新增） */}
+        <div className="mb-4">
+          {justInstalled ? (
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
+              ✅ 已安装到桌面！以后从桌面图标打开就是 App 模式。
+            </div>
+          ) : isStandalone ? (
+            <div className="rounded-2xl border border-zinc-200 bg-white p-3 text-sm text-zinc-700">
+              ✅ 当前正在以 <span className="font-semibold">App 模式</span> 运行（standalone）。
+            </div>
+          ) : deferredPrompt ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-zinc-200 bg-white p-3">
+              <div className="text-sm text-zinc-700">
+                📲 想像 App 一样使用？安装到桌面后可全屏打开、更像原生应用。
+              </div>
+              <Button onClick={promptInstall}>安装到桌面</Button>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-zinc-200 bg-white p-3 text-sm text-zinc-600">
+              ℹ️ 如果 Chrome 没出现“安装”按钮：先正常使用一会儿，再在右上角菜单里选择「添加到主屏幕」。
+              <span className="ml-2 text-zinc-500">（记得定期导出 ZIP 备份，卸载/清理数据会丢记录）</span>
+            </div>
+          )}
+        </div>
+
         <div className="grid grid-cols-1 gap-4 md:grid-cols-12">
           {/* 左：多肉列表 */}
           <div className="md:col-span-4 space-y-3">
