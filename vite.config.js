@@ -3,6 +3,11 @@ import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 
 export default defineConfig({
+  server: {
+    host: '0.0.0.0', // 允许外部访问（手机可以通过局域网 IP 访问）
+    port: 5173,
+    allowedHosts: ["frowzy-isreal-intermunicipal.ngrok-free.dev"],
+  },
   plugins: [
     react(),
     VitePWA({
