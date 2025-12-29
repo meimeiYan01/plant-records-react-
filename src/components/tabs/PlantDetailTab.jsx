@@ -16,17 +16,23 @@ export function PlantDetailTab({
   openImageViewer,
   onBack,
 }) {
-  // 获取时间线图片
+  // 获取时间线图片（兼容旧数据：支持 photoKey 和 photoKeys）
   const timelineImages = useMemo(() => {
     const images = [];
     events.forEach((e) => {
-      if (e.photoKey) {
-        images.push({
-          key: e.photoKey,
-          ext: extFromMime("image/jpeg"),
-          filename: `${plant.name}-${formatDateTime(e.at).replace(/[:\s]/g, "-")}.jpg`,
-        });
-      }
+      const photoKeys = e.photoKeys 
+        ? (Array.isArray(e.photoKeys) ? e.photoKeys : [e.photoKeys])
+        : (e.photoKey ? [e.photoKey] : []);
+      
+      photoKeys.forEach((key, idx) => {
+        if (key) {
+          images.push({
+            key,
+            ext: extFromMime("image/jpeg"),
+            filename: `${plant.name}-${formatDateTime(e.at).replace(/[:\s]/g, "-")}-${idx + 1}.jpg`,
+          });
+        }
+      });
     });
     return images;
   }, [events, plant.name]);
@@ -125,7 +131,12 @@ export function PlantDetailTab({
             </div>
           ) : (
             events.map((e) => {
-              const imageIndex = timelineImages.findIndex((img) => img.key === e.photoKey);
+              // 兼容旧数据：支持 photoKey 和 photoKeys
+              const photoKeys = e.photoKeys 
+                ? (Array.isArray(e.photoKeys) ? e.photoKeys : [e.photoKeys])
+                : (e.photoKey ? [e.photoKey] : []);
+              const firstPhotoKey = photoKeys[0] || "";
+              const imageIndex = firstPhotoKey ? timelineImages.findIndex((img) => img.key === firstPhotoKey) : -1;
               const isLogEvent = e.type === "log";
               const relatedLog = isLogEvent && generalLogs ? generalLogs.find((l) => l.id === e.logId) : null;
 
@@ -225,23 +236,49 @@ export function PlantDetailTab({
                         </div>
                       ) : null}
                       {e.note ? <div className="mt-2 text-sm text-zinc-800 dark:text-zinc-300">{e.note}</div> : null}
-                      {e.photoKey ? (
+                      {photoKeys.length > 0 ? (
                         <div className="mt-3">
-                          <div
-                            className="cursor-pointer inline-block"
-                            onClick={() => {
-                              if (timelineImages.length > 0) {
-                                openImageViewer(timelineImages, imageIndex >= 0 ? imageIndex : 0);
-                              }
-                            }}
-                          >
-                            <ImageFromIdb
-                              imgKey={e.photoKey}
-                              getUrlForKey={getUrlForKey}
-                              alt="event"
-                              className="h-44 w-44 rounded-xl border object-cover hover:opacity-90 transition"
-                            />
-                          </div>
+                          {photoKeys.length === 1 ? (
+                            <div
+                              className="cursor-pointer inline-block"
+                              onClick={() => {
+                                if (timelineImages.length > 0 && imageIndex >= 0) {
+                                  openImageViewer(timelineImages, imageIndex);
+                                }
+                              }}
+                            >
+                              <ImageFromIdb
+                                imgKey={photoKeys[0]}
+                                getUrlForKey={getUrlForKey}
+                                alt="event"
+                                className="h-44 w-44 rounded-xl border object-cover hover:opacity-90 transition"
+                              />
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-3 gap-2">
+                              {photoKeys.slice(0, 6).map((key, idx) => {
+                                const imgIndex = timelineImages.findIndex((img) => img.key === key);
+                                return (
+                                  <div
+                                    key={key}
+                                    className="cursor-pointer"
+                                    onClick={() => {
+                                      if (timelineImages.length > 0 && imgIndex >= 0) {
+                                        openImageViewer(timelineImages, imgIndex);
+                                      }
+                                    }}
+                                  >
+                                    <ImageFromIdb
+                                      imgKey={key}
+                                      getUrlForKey={getUrlForKey}
+                                      alt="event"
+                                      className="h-24 w-full rounded-xl border object-cover hover:opacity-90 transition"
+                                    />
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
                       ) : null}
                     </>

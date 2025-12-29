@@ -21,9 +21,14 @@ export function collectReferencedImageKeys(state) {
     if (p.coverPhotoKey) keys.add(p.coverPhotoKey);
   }
   
-  // 事件照片
+  // 事件照片（兼容旧数据：支持 photoKey 和 photoKeys）
   for (const e of state.events || []) {
-    if (e.photoKey) keys.add(e.photoKey);
+    const photoKeys = e.photoKeys 
+      ? (Array.isArray(e.photoKeys) ? e.photoKeys : [e.photoKeys])
+      : (e.photoKey ? [e.photoKey] : []);
+    photoKeys.forEach((key) => {
+      if (key) keys.add(key);
+    });
   }
   
   // 日志照片
@@ -107,12 +112,25 @@ export async function importBackupZip(file) {
       ...p,
       coverPhotoKey: p.coverPhotoKey || "",
     })),
-    events: (state.events || []).map((e) => ({
-      tags: [],
-      photoKey: "",
-      ...e,
-      photoKey: e.photoKey || "",
-    })),
+    events: (state.events || []).map((e) => {
+      // 兼容旧数据：photoKey（单个）转为 photoKeys（数组）
+      const getPhotoKeys = () => {
+        if (e.photoKeys && Array.isArray(e.photoKeys)) {
+          return e.photoKeys;
+        }
+        if (e.photoKey) {
+          return [e.photoKey];
+        }
+        return [];
+      };
+      
+      return {
+        tags: [],
+        ...e,
+        photoKeys: getPhotoKeys(),
+        tags: e.tags || [],
+      };
+    }),
     generalLogs: (state.generalLogs || []).map((log) => ({
       photos: [],
       tags: [],

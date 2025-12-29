@@ -19,11 +19,24 @@ export function DataPanelModal({ state, onClose, onImport, onReset, onExportZip,
           ...p,
           coverPhotoKey: p.coverPhotoKey || "",
         })),
-        events: (parsed.events || []).map((e) => ({
-          ...e,
-          tags: e.tags || [],
-          photoKey: e.photoKey || "",
-        })),
+        events: (parsed.events || []).map((e) => {
+          // 兼容旧数据：photoKey（单个）转为 photoKeys（数组）
+          const getPhotoKeys = () => {
+            if (e.photoKeys && Array.isArray(e.photoKeys)) {
+              return e.photoKeys;
+            }
+            if (e.photoKey) {
+              return [e.photoKey];
+            }
+            return [];
+          };
+          
+          return {
+            ...e,
+            tags: e.tags || [],
+            photoKeys: getPhotoKeys(),
+          };
+        }),
       });
     } catch (e) {
       setErr(String(e.message || e));

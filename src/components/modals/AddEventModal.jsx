@@ -1,57 +1,70 @@
 import { useEffect, useState } from "react";
 import { Modal } from "../ui/Modal";
 import { Button } from "../ui/Button";
+import { ImageFromIdb } from "../ui/ImageFromIdb";
 import { saveImageToIdb, deleteImageFromIdb, MAX_IMAGE_BYTES, EVENT_TYPES, TAGS, uid } from "../../utils";
 
-export function AddEventModal({ plant, onClose, onCreate }) {
+export function AddEventModal({ plant, getUrlForKey, onClose, onCreate }) {
   const [type, setType] = useState("water");
   const [tags, setTags] = useState([]);
   const [note, setNote] = useState("");
-  const [photoKey, setPhotoKey] = useState("");
-  const [previewUrl, setPreviewUrl] = useState("");
+  const [photoKeys, setPhotoKeys] = useState([]);
+  const [previewUrls, setPreviewUrls] = useState({});
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     return () => {
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      Object.values(previewUrls).forEach((url) => {
+        if (url) URL.revokeObjectURL(url);
+      });
     };
-  }, [previewUrl]);
+  }, [previewUrls]);
 
   function toggleTag(t) {
     setTags((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]));
   }
 
   async function handlePick(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
 
-    if (file.size > MAX_IMAGE_BYTES) {
-      alert(`图片太大（>${Math.floor(MAX_IMAGE_BYTES / 1024 / 1024)}MB）。先用小一点的图。`);
-      e.target.value = "";
-      return;
+    const validFiles = files.filter((file) => file.size <= MAX_IMAGE_BYTES);
+    if (validFiles.length !== files.length) {
+      alert(`部分图片太大（>${Math.floor(MAX_IMAGE_BYTES / 1024 / 1024)}MB），已跳过。`);
     }
 
     setLoading(true);
     try {
-      const key = await saveImageToIdb(file);
-      setPhotoKey(key);
+      const newKeys = [];
+      const newUrls = { ...previewUrls };
 
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
-      setPreviewUrl(URL.createObjectURL(file));
+      for (const file of validFiles) {
+        const key = await saveImageToIdb(file);
+        newKeys.push(key);
+        newUrls[key] = URL.createObjectURL(file);
+      }
+
+      setPhotoKeys((prev) => [...prev, ...newKeys]);
+      setPreviewUrls(newUrls);
     } catch (err) {
       alert(String(err.message || err));
     } finally {
       setLoading(false);
+      e.target.value = "";
     }
   }
 
-  async function removePicked() {
-    if (photoKey) {
-      await deleteImageFromIdb(photoKey);
-      setPhotoKey("");
+  async function removePhoto(key) {
+    await deleteImageFromIdb(key);
+    setPhotoKeys((prev) => prev.filter((k) => k !== key));
+    if (previewUrls[key]) {
+      URL.revokeObjectURL(previewUrls[key]);
+      setPreviewUrls((prev) => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
     }
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
-    setPreviewUrl("");
   }
 
   return (
@@ -91,22 +104,38 @@ export function AddEventModal({ plant, onClose, onCreate }) {
         </div>
 
         <div>
-          <div className="mb-1 text-xs text-zinc-500">事件照片（可选）</div>
-          <input type="file" accept="image/*" onChange={handlePick} />
-          <div className="mt-2">
-            {loading ? (
-              <div className="text-sm text-zinc-500">保存中…</div>
-            ) : previewUrl ? (
-              <div className="flex items-center gap-3">
-                <img src={previewUrl} alt="preview" className="h-28 w-28 rounded-2xl border object-cover" />
-                <Button variant="secondary" onClick={removePicked}>
-                  移除
-                </Button>
-              </div>
-            ) : (
-              <div className="text-sm text-zinc-400">未选择照片</div>
-            )}
-          </div>
+          <div className="mb-1 text-xs text-zinc-500">事件照片（可选，可多选）</div>
+          <input type="file" accept="image/*" multiple onChange={handlePick} />
+          {loading && <div className="mt-2 text-sm text-zinc-500">保存中…</div>}
+          {photoKeys.length > 0 && (
+            <div className="mt-2 grid grid-cols-3 gap-2">
+              {photoKeys.map((key) => (
+                <div key={key} className="relative">
+                  {previewUrls[key] ? (
+                    <img
+                      src={previewUrls[key]}
+                      alt="preview"
+                      className="h-20 w-full rounded-xl border object-cover"
+                    />
+                  ) : (
+                    <ImageFromIdb
+                      imgKey={key}
+                      getUrlForKey={getUrlForKey}
+                      alt="preview"
+                      className="h-20 w-full rounded-xl border object-cover"
+                    />
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => removePhoto(key)}
+                    className="absolute right-1 top-1 rounded-full bg-black/50 p-1 text-white hover:bg-black/70"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div>
@@ -133,7 +162,7 @@ export function AddEventModal({ plant, onClose, onCreate }) {
                 at: new Date().toISOString(),
                 tags,
                 note: note.trim(),
-                photoKey: photoKey || "",
+                photoKeys: photoKeys,
               })
             }
           >

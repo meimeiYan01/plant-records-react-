@@ -148,6 +148,11 @@ export default function App() {
         const logTitle = `${plant?.name || "多肉"} - ${eventTypeLabel}`;
         const logContent = ev.note || "";
         
+        // 兼容旧数据：支持 photoKey 和 photoKeys
+        const photoKeys = ev.photoKeys 
+          ? (Array.isArray(ev.photoKeys) ? ev.photoKeys : [ev.photoKeys])
+          : (ev.photoKey ? [ev.photoKey] : []);
+        
         const log = {
           id: `log_event_${ev.id}`,
           type: "daily",
@@ -155,7 +160,7 @@ export default function App() {
           content: logContent,
           date: ev.at,
           tags: ev.tags || [],
-          photos: ev.photoKey ? [ev.photoKey] : [],
+          photos: photoKeys,
           weather: "",
           mood: "",
           relatedPlants: [ev.plantId],
@@ -193,7 +198,11 @@ export default function App() {
           existingLog.content = updatedEvent.note || "";
           existingLog.date = updatedEvent.at;
           existingLog.tags = updatedEvent.tags || [];
-          existingLog.photos = updatedEvent.photoKey ? [updatedEvent.photoKey] : [];
+          // 兼容旧数据：支持 photoKey 和 photoKeys
+          const photoKeys = updatedEvent.photoKeys 
+            ? (Array.isArray(updatedEvent.photoKeys) ? updatedEvent.photoKeys : [updatedEvent.photoKeys])
+            : (updatedEvent.photoKey ? [updatedEvent.photoKey] : []);
+          existingLog.photos = photoKeys;
         }
       }
       
@@ -217,7 +226,13 @@ export default function App() {
     // 删除关联的事件和图片
     const relatedEvents = state.events.filter((e) => e.plantId === plantId);
     relatedEvents.forEach((e) => {
-      if (e.photoKey) imageKeys.add(e.photoKey);
+      // 兼容旧数据：支持 photoKey 和 photoKeys
+      const photoKeys = e.photoKeys 
+        ? (Array.isArray(e.photoKeys) ? e.photoKeys : [e.photoKeys])
+        : (e.photoKey ? [e.photoKey] : []);
+      photoKeys.forEach((key) => {
+        if (key) imageKeys.add(key);
+      });
     });
 
     // 删除图片
@@ -240,10 +255,13 @@ export default function App() {
     const event = state.events.find((e) => e.id === eventId);
     if (!event) return;
 
-    // 删除关联的图片
-    if (event.photoKey) {
-      removeImageKey(event.photoKey).catch(() => {});
-    }
+    // 删除关联的图片（兼容旧数据：支持 photoKey 和 photoKeys）
+    const photoKeys = event.photoKeys 
+      ? (Array.isArray(event.photoKeys) ? event.photoKeys : [event.photoKeys])
+      : (event.photoKey ? [event.photoKey] : []);
+    photoKeys.forEach((key) => {
+      if (key) removeImageKey(key).catch(() => {});
+    });
 
     // 如果不是来自日志的事件，同步删除对应的日志
     const logIdToDelete = event.type !== "log" ? `log_event_${eventId}` : null;
@@ -297,7 +315,7 @@ export default function App() {
             at: log.date,
             tags: log.tags || [],
             note: log.title || log.content || "",
-            photoKey: log.photos && log.photos.length > 0 ? log.photos[0] : "", // 使用第一张照片
+            photoKeys: log.photos || [], // 使用所有照片
           };
           newEvents.push(event);
         });
@@ -330,7 +348,7 @@ export default function App() {
             existingEvent.at = updatedLog.date;
             existingEvent.tags = updatedLog.tags || [];
             existingEvent.note = updatedLog.title || updatedLog.content || "";
-            existingEvent.photoKey = updatedLog.photos && updatedLog.photos.length > 0 ? updatedLog.photos[0] : "";
+            existingEvent.photoKeys = updatedLog.photos || [];
           } else {
             // 创建新事件
             filteredEvents.push({
@@ -341,7 +359,7 @@ export default function App() {
               at: updatedLog.date,
               tags: updatedLog.tags || [],
               note: updatedLog.title || updatedLog.content || "",
-              photoKey: updatedLog.photos && updatedLog.photos.length > 0 ? updatedLog.photos[0] : "",
+              photoKeys: updatedLog.photos || [],
             });
           }
         });
@@ -440,16 +458,25 @@ export default function App() {
     setImageViewer({ images, currentIndex, onViewDetail: options.onViewDetail });
   }
 
-  // 收集时间线中的所有图片用于查看器
+  // 收集时间线中的所有图片用于查看器（兼容旧数据：支持 photoKey 和 photoKeys）
   function getTimelineImages() {
     if (!selectedId) return [];
-    return events
-      .filter((e) => e.photoKey)
-      .map((e, idx) => ({
-        key: e.photoKey,
-        ext: "jpg", // 将在下载时从 blob.type 获取
-        filename: `${e.type}-${formatDateTime(e.at).replace(/[:\s]/g, "-")}.jpg`,
-      }));
+    const images = [];
+    events.forEach((e) => {
+      const photoKeys = e.photoKeys 
+        ? (Array.isArray(e.photoKeys) ? e.photoKeys : [e.photoKeys])
+        : (e.photoKey ? [e.photoKey] : []);
+      photoKeys.forEach((key, idx) => {
+        if (key) {
+          images.push({
+            key,
+            ext: "jpg", // 将在下载时从 blob.type 获取
+            filename: `${e.type}-${formatDateTime(e.at).replace(/[:\s]/g, "-")}-${idx + 1}.jpg`,
+          });
+        }
+      });
+    });
+    return images;
   }
 
   // ZIP 备份处理
@@ -657,6 +684,7 @@ export default function App() {
       {showAddEvent && selectedPlant && (
         <AddEventModal
           plant={selectedPlant}
+          getUrlForKey={getUrlForKey}
           onClose={() => setShowAddEvent(false)}
           onCreate={(e) => {
             addEvent(e);
