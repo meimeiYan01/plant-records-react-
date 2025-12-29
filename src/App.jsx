@@ -10,14 +10,17 @@ import {
   EditLogModal,
   AddExpenseModal,
   EditExpenseModal,
+  AddKnowledgeModal,
+  EditKnowledgeModal,
   DataPanelModal,
   LocationManagerModal,
 } from "./components/modals";
-import { LogsTab, ExpensesTab, HomeTab, SettingsTab, PlantDetailTab, PlantsTab } from "./components/tabs";
+import { LogsTab, ExpensesTab, HomeTab, SettingsTab, PlantDetailTab, PlantsTab, KnowledgeTab } from "./components/tabs";
 import { loadState, saveState, daysSince, formatDateTime, LS_KEY, EVENT_TYPES, extFromMime } from "./utils";
 import { exportBackupZip, importBackupZip } from "./services/backupService";
 import { collectLogImageKeys } from "./services/logService";
 import { collectExpenseImageKeys } from "./services/expenseService";
+import { collectKnowledgeImageKeys } from "./services/knowledgeService";
 
 /**
  * 多肉记录 App · MVP（IndexedDB 照片 + ZIP 备份，可直接打开图片）
@@ -38,6 +41,7 @@ export default function App() {
         locations: loaded.locations || ["南窗", "东窗", "北窗", "补光灯架"],
         generalLogs: loaded.generalLogs || [],
         expenses: loaded.expenses || [],
+        knowledges: loaded.knowledges || [],
       };
     }
     return {
@@ -46,10 +50,11 @@ export default function App() {
       locations: ["南窗", "东窗", "北窗", "补光灯架"],
       generalLogs: [],
       expenses: [],
+      knowledges: [],
     };
   });
 
-  const [currentTab, setCurrentTab] = useState("home"); // home | plants | logs | expenses | settings
+  const [currentTab, setCurrentTab] = useState("home"); // home | plants | logs | expenses | knowledge | settings
   const [selectedId, setSelectedId] = useState(null);
   const [showPlantDetail, setShowPlantDetail] = useState(false);
   const [plantDetailFromTab, setPlantDetailFromTab] = useState(null); // 记录从哪个标签页进入详情页
@@ -61,9 +66,11 @@ export default function App() {
   const [showEditEvent, setShowEditEvent] = useState(null); // event id
   const [showEditLog, setShowEditLog] = useState(null); // log id
   const [showEditExpense, setShowEditExpense] = useState(null); // expense id
+  const [showAddKnowledge, setShowAddKnowledge] = useState(false);
+  const [showEditKnowledge, setShowEditKnowledge] = useState(null); // knowledge id
   const [showDataPanel, setShowDataPanel] = useState(false);
   const [showLocationManager, setShowLocationManager] = useState(false);
-  const [deleteConfirm, setDeleteConfirm] = useState(null); // { type: 'plant'|'event'|'log'|'expense', id, name }
+  const [deleteConfirm, setDeleteConfirm] = useState(null); // { type: 'plant'|'event'|'log'|'expense'|'knowledge', id, name }
   const [imageViewer, setImageViewer] = useState(null); // { images: [], currentIndex: 0 }
 
   // 主题管理
@@ -392,6 +399,33 @@ export default function App() {
     }));
   }
 
+  // 知识管理函数
+  function addKnowledge(knowledge) {
+    setState((s) => ({ ...s, knowledges: [knowledge, ...(s.knowledges || [])] }));
+  }
+
+  function updateKnowledge(updatedKnowledge) {
+    setState((s) => ({
+      ...s,
+      knowledges: (s.knowledges || []).map((k) => (k.id === updatedKnowledge.id ? updatedKnowledge : k)),
+    }));
+  }
+
+  function deleteKnowledge(knowledgeId) {
+    const knowledge = state.knowledges?.find((k) => k.id === knowledgeId);
+    if (!knowledge) return;
+
+    // 删除关联的封面图
+    if (knowledge.coverPhotoKey) {
+      removeImageKey(knowledge.coverPhotoKey).catch(() => {});
+    }
+
+    setState((s) => ({
+      ...s,
+      knowledges: (s.knowledges || []).filter((k) => k.id !== knowledgeId),
+    }));
+  }
+
   function resetAll() {
     localStorage.removeItem(LS_KEY);
     window.location.reload();
@@ -564,6 +598,23 @@ export default function App() {
           />
         )}
 
+        {currentTab === "knowledge" && (
+          <KnowledgeTab
+            knowledges={state.knowledges || []}
+            getUrlForKey={getUrlForKey}
+            onAdd={() => setShowAddKnowledge(true)}
+            onEdit={(id) => setShowEditKnowledge(id)}
+            onDelete={(id) =>
+              setDeleteConfirm({
+                type: "knowledge",
+                id,
+                name: state.knowledges?.find((k) => k.id === id)?.title || "知识",
+              })
+            }
+            openImageViewer={openImageViewer}
+          />
+        )}
+
         {currentTab === "settings" && (
           <SettingsTab
             onLocationManager={() => setShowLocationManager(true)}
@@ -572,6 +623,7 @@ export default function App() {
             plantsCount={state.plants.length}
             logsCount={state.generalLogs?.length || 0}
             expensesCount={state.expenses?.length || 0}
+            knowledgesCount={state.knowledges?.length || 0}
             justInstalled={justInstalled}
             isStandalone={isStandalone}
             deferredPrompt={deferredPrompt}
@@ -708,6 +760,29 @@ export default function App() {
         />
       )}
 
+      {showAddKnowledge && (
+        <AddKnowledgeModal
+          getUrlForKey={getUrlForKey}
+          onClose={() => setShowAddKnowledge(false)}
+          onCreate={(knowledge) => {
+            addKnowledge(knowledge);
+            setShowAddKnowledge(false);
+          }}
+        />
+      )}
+
+      {showEditKnowledge && (
+        <EditKnowledgeModal
+          knowledge={state.knowledges?.find((k) => k.id === showEditKnowledge)}
+          getUrlForKey={getUrlForKey}
+          onClose={() => setShowEditKnowledge(null)}
+          onUpdate={(updated) => {
+            updateKnowledge(updated);
+            setShowEditKnowledge(null);
+          }}
+        />
+      )}
+
       {deleteConfirm && (
         <ConfirmDialog
           title="确认删除"
@@ -718,7 +793,11 @@ export default function App() {
               ? `确定要删除事件"${deleteConfirm.name}"吗？此操作不可恢复。`
               : deleteConfirm.type === "log"
               ? `确定要删除日志"${deleteConfirm.name}"吗？此操作不可恢复。`
-              : `确定要删除花费记录"${deleteConfirm.name}"吗？此操作不可恢复。`
+              : deleteConfirm.type === "expense"
+              ? `确定要删除花费记录"${deleteConfirm.name}"吗？此操作不可恢复。`
+              : deleteConfirm.type === "knowledge"
+              ? `确定要删除知识"${deleteConfirm.name}"吗？此操作不可恢复。`
+              : `确定要删除吗？此操作不可恢复。`
           }
           confirmText="删除"
           cancelText="取消"
@@ -731,6 +810,8 @@ export default function App() {
               deleteLog(deleteConfirm.id);
             } else if (deleteConfirm.type === "expense") {
               deleteExpense(deleteConfirm.id);
+            } else if (deleteConfirm.type === "knowledge") {
+              deleteKnowledge(deleteConfirm.id);
             }
             setDeleteConfirm(null);
           }}

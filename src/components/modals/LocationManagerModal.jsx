@@ -143,3 +143,4 @@ export function LocationManagerModal({ locations, plants, onClose, onUpdate }) {
   );
 }
 
+

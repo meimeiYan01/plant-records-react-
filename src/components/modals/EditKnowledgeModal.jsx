@@ -1,0 +1,240 @@
+import { useEffect, useState } from "react";
+import { Modal } from "../ui/Modal";
+import { Button } from "../ui/Button";
+import { ImageFromIdb } from "../ui/ImageFromIdb";
+import {
+  saveImageToIdb,
+  deleteImageFromIdb,
+  MAX_IMAGE_BYTES,
+  KNOWLEDGE_TYPES,
+  KNOWLEDGE_TAGS,
+  formatDateTime,
+} from "../../utils";
+
+export function EditKnowledgeModal({ knowledge, getUrlForKey, onClose, onUpdate }) {
+  const [type, setType] = useState(knowledge.type || "markdown");
+  const [title, setTitle] = useState(knowledge.title || "");
+  const [content, setContent] = useState(knowledge.content || "");
+  const [url, setUrl] = useState(knowledge.url || "");
+  const [tags, setTags] = useState(knowledge.tags || []);
+  const [source, setSource] = useState(knowledge.source || "");
+  const [coverPhotoKey, setCoverPhotoKey] = useState(knowledge.coverPhotoKey || "");
+  const [previewUrl, setPreviewUrl] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [oldCoverPhotoKey, setOldCoverPhotoKey] = useState(knowledge.coverPhotoKey || "");
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
+
+  function toggleTag(t) {
+    setTags((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]));
+  }
+
+  async function handlePickCover(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > MAX_IMAGE_BYTES) {
+      alert(`图片太大（>${Math.floor(MAX_IMAGE_BYTES / 1024 / 1024)}MB），建议换小一点的图。`);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const key = await saveImageToIdb(file);
+      setCoverPhotoKey(key);
+      setPreviewUrl(URL.createObjectURL(file));
+    } catch (err) {
+      alert(String(err.message || err));
+    } finally {
+      setLoading(false);
+      e.target.value = "";
+    }
+  }
+
+  async function removeCover() {
+    if (coverPhotoKey) {
+      await deleteImageFromIdb(coverPhotoKey);
+      setCoverPhotoKey("");
+    }
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+      setPreviewUrl("");
+    }
+  }
+
+  function handleSave() {
+    if (!title.trim()) {
+      alert("请输入标题");
+      return;
+    }
+    if (type !== "markdown" && !url.trim()) {
+      alert("请输入URL");
+      return;
+    }
+
+    // 删除旧封面图（如果被移除）
+    if (oldCoverPhotoKey && oldCoverPhotoKey !== coverPhotoKey) {
+      deleteImageFromIdb(oldCoverPhotoKey).catch(() => {});
+    }
+
+    const updated = {
+      ...knowledge,
+      type,
+      title: title.trim(),
+      content: content.trim(),
+      url: url.trim(),
+      tags,
+      source: source.trim(),
+      coverPhotoKey,
+      updatedAt: new Date().toISOString(),
+    };
+    onUpdate(updated);
+  }
+
+  return (
+    <Modal title="编辑知识" onClose={onClose}>
+      <div className="space-y-3 max-h-[70vh] overflow-y-auto">
+        <div className="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 p-2 text-xs text-zinc-600 dark:text-zinc-400">
+          创建时间：{formatDateTime(knowledge.createdAt)}
+        </div>
+
+        <div>
+          <div className="mb-1 text-xs text-zinc-500 dark:text-zinc-400">知识类型</div>
+          <select
+            className="w-full rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 outline-none focus:border-zinc-900 dark:focus:border-zinc-600"
+            value={type}
+            onChange={(e) => setType(e.target.value)}
+          >
+            {KNOWLEDGE_TYPES.map((t) => (
+              <option key={t.key} value={t.key}>
+                {t.icon} {t.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <div className="mb-1 text-xs text-zinc-500 dark:text-zinc-400">标题 *</div>
+          <input
+            className="w-full rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 outline-none focus:border-zinc-900 dark:focus:border-zinc-600"
+            placeholder="输入知识标题"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+          />
+        </div>
+
+        {type === "markdown" ? (
+          <div>
+            <div className="mb-1 text-xs text-zinc-500 dark:text-zinc-400">Markdown内容</div>
+            <textarea
+              className="w-full rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 outline-none focus:border-zinc-900 dark:focus:border-zinc-600"
+              rows={8}
+              placeholder="输入Markdown格式的内容..."
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+            />
+          </div>
+        ) : (
+          <>
+            <div>
+              <div className="mb-1 text-xs text-zinc-500 dark:text-zinc-400">URL *</div>
+              <input
+                className="w-full rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 outline-none focus:border-zinc-900 dark:focus:border-zinc-600"
+                type="url"
+                placeholder="https://..."
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+              />
+            </div>
+            <div>
+              <div className="mb-1 text-xs text-zinc-500 dark:text-zinc-400">描述/备注</div>
+              <textarea
+                className="w-full rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 outline-none focus:border-zinc-900 dark:focus:border-zinc-600"
+                rows={4}
+                placeholder="记录一些关键信息或备注..."
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+              />
+            </div>
+          </>
+        )}
+
+        <div>
+          <div className="mb-1 text-xs text-zinc-500 dark:text-zinc-400">来源（可选）</div>
+          <input
+            className="w-full rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 outline-none focus:border-zinc-900 dark:focus:border-zinc-600"
+            placeholder="例如：B站、知乎、小红书等"
+            value={source}
+            onChange={(e) => setSource(e.target.value)}
+          />
+        </div>
+
+        <div>
+          <div className="mb-1 text-xs text-zinc-500 dark:text-zinc-400">标签（可选）</div>
+          <div className="flex flex-wrap gap-2">
+            {KNOWLEDGE_TAGS.map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => toggleTag(t)}
+                className={`rounded-full border px-2 py-1 text-xs transition ${
+                  tags.includes(t)
+                    ? "border-zinc-900 dark:border-zinc-600 bg-zinc-900 dark:bg-zinc-700 text-white dark:text-zinc-100"
+                    : "border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700"
+                }`}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <div className="mb-1 text-xs text-zinc-500 dark:text-zinc-400">封面图（可选）</div>
+          <input type="file" accept="image/*" onChange={handlePickCover} />
+          {loading && <div className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">保存中…</div>}
+          {coverPhotoKey && (
+            <div className="mt-2 relative inline-block">
+              {previewUrl ? (
+                <img
+                  src={previewUrl}
+                  alt="cover preview"
+                  className="h-32 w-auto rounded-xl border border-zinc-200 dark:border-zinc-700 object-cover"
+                />
+              ) : (
+                <ImageFromIdb
+                  imgKey={coverPhotoKey}
+                  getUrlForKey={getUrlForKey}
+                  alt="cover"
+                  className="h-32 w-auto rounded-xl border border-zinc-200 dark:border-zinc-700 object-cover"
+                />
+              )}
+              <button
+                type="button"
+                onClick={removeCover}
+                className="absolute right-1 top-1 rounded-full bg-black/50 p-1 text-white hover:bg-black/70"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="secondary" onClick={onClose}>
+            取消
+          </Button>
+          <Button onClick={handleSave}>
+            保存
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+

@@ -3,6 +3,7 @@ import { get as idbGet } from "idb-keyval";
 import { BACKUP_VERSION, extFromMime, setImageToIdbWithKey, downloadBlob, nowStamp } from "../utils";
 import { collectLogImageKeys } from "./logService";
 import { collectExpenseImageKeys } from "./expenseService";
+import { collectKnowledgeImageKeys } from "./knowledgeService";
 
 /**
  * 备份服务
@@ -32,6 +33,10 @@ export function collectReferencedImageKeys(state) {
   // 花费照片
   const expenseKeys = collectExpenseImageKeys(state.expenses || []);
   expenseKeys.forEach((k) => keys.add(k));
+  
+  // 知识封面图
+  const knowledgeKeys = collectKnowledgeImageKeys(state.knowledges || []);
+  knowledgeKeys.forEach((k) => keys.add(k));
   
   return Array.from(keys);
 }
@@ -123,6 +128,13 @@ export async function importBackupZip(file) {
       ...exp,
       photos: exp.photos || [],
       tags: exp.tags || [],
+    })),
+    knowledges: (state.knowledges || []).map((k) => ({
+      coverPhotoKey: "",
+      tags: [],
+      ...k,
+      coverPhotoKey: k.coverPhotoKey || "",
+      tags: k.tags || [],
     })),
   };
 

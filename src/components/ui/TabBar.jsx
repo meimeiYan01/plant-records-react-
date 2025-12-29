@@ -4,6 +4,7 @@ export function TabBar({ currentTab, onTabChange }) {
     { key: "plants", label: "多肉", icon: "🌱" },
     { key: "logs", label: "日志", icon: "📝" },
     { key: "expenses", label: "花费", icon: "💰" },
+    { key: "knowledge", label: "知识", icon: "📚" },
     { key: "settings", label: "设置", icon: "⚙️" },
   ];
 

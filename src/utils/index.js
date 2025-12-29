@@ -53,6 +53,17 @@ export const MOOD_OPTIONS = ["开心", "兴奋", "平静", "担心", "难过", "
 // 花费标签（常用）
 export const EXPENSE_TAGS = ["必需品", "升级", "补充", "一次性", "定期"];
 
+// 知识类型
+export const KNOWLEDGE_TYPES = [
+  { key: "markdown", label: "Markdown文档", icon: "📝" },
+  { key: "article", label: "网页文章", icon: "📄" },
+  { key: "video", label: "网页视频", icon: "🎥" },
+  { key: "xiaohongshu", label: "小红书笔记", icon: "📱" },
+];
+
+// 知识标签（常用）
+export const KNOWLEDGE_TAGS = ["养护", "繁殖", "病虫害", "配土", "浇水", "光照", "换盆", "修剪", "品种介绍", "经验分享"];
+
 /* ---------------- 工具函数 ---------------- */
 
 export function uid(prefix = "id") {

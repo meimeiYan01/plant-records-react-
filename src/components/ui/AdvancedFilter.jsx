@@ -8,7 +8,8 @@ export function AdvancedFilter({
   onApply, 
   tags = [], 
   plants = [],
-  initialFilters = {}
+  initialFilters = {},
+  showPlantFilter = true
 }) {
   const [filters, setFilters] = useState({
     dateFrom: initialFilters.dateFrom || "",
@@ -106,7 +107,7 @@ export function AdvancedFilter({
         )}
 
         {/* 关联多肉 */}
-        {plants.length > 0 && (
+        {showPlantFilter && plants.length > 0 && (
           <div>
             <div className="mb-2 text-sm font-medium text-zinc-900">关联多肉</div>
             <div className="max-h-32 overflow-y-auto rounded-lg border border-zinc-200 p-2">

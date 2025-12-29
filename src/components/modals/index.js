@@ -6,6 +6,8 @@ export { AddLogModal } from "./AddLogModal";
 export { EditLogModal } from "./EditLogModal";
 export { AddExpenseModal } from "./AddExpenseModal";
 export { EditExpenseModal } from "./EditExpenseModal";
+export { AddKnowledgeModal } from "./AddKnowledgeModal";
+export { EditKnowledgeModal } from "./EditKnowledgeModal";
 export { DataPanelModal } from "./DataPanelModal";
 export { LocationManagerModal } from "./LocationManagerModal";
 

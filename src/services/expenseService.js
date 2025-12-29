@@ -86,3 +86,4 @@ export function calculateExpenseByType(expenses, currency = "CNY") {
   return byType;
 }
 
+

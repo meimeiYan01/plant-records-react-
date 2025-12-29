@@ -11,3 +11,4 @@ export function ImageFromIdb({ imgKey, getUrlForKey, className, alt }) {
   return <img src={url} alt={alt} className={className} />;
 }
 
+

@@ -4,6 +4,7 @@ export { Modal } from "./Modal";
 export { ImageFromIdb } from "./ImageFromIdb";
 export { ConfirmDialog } from "./ConfirmDialog";
 export { ImageViewer } from "./ImageViewer";
+export { MarkdownRenderer } from "./MarkdownRenderer";
 export { TabBar } from "./TabBar";
 export { AdvancedFilter } from "./AdvancedFilter";
 

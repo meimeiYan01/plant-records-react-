@@ -7,6 +7,7 @@ export function SettingsTab({
   plantsCount,
   logsCount,
   expensesCount,
+  knowledgesCount,
   justInstalled,
   isStandalone,
   deferredPrompt,
@@ -17,7 +18,7 @@ export function SettingsTab({
   return (
     <div className="space-y-4 pb-20">
       {/* 统计信息 */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="rounded-2xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-4 text-center">
           <div className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{plantsCount}</div>
           <div className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">多肉</div>
@@ -29,6 +30,10 @@ export function SettingsTab({
         <div className="rounded-2xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-4 text-center">
           <div className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{expensesCount}</div>
           <div className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">花费</div>
+        </div>
+        <div className="rounded-2xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-4 text-center">
+          <div className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{knowledgesCount || 0}</div>
+          <div className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">知识</div>
         </div>
       </div>
 
