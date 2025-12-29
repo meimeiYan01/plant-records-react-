@@ -129,13 +129,25 @@ export async function importBackupZip(file) {
       photos: exp.photos || [],
       tags: exp.tags || [],
     })),
-    knowledges: (state.knowledges || []).map((k) => ({
-      coverPhotoKey: "",
-      tags: [],
-      ...k,
-      coverPhotoKey: k.coverPhotoKey || "",
-      tags: k.tags || [],
-    })),
+    knowledges: (state.knowledges || []).map((k) => {
+      // 兼容旧数据：coverPhotoKey（单个）转为 coverPhotoKeys（数组）
+      const getCoverPhotoKeys = () => {
+        if (k.coverPhotoKeys && Array.isArray(k.coverPhotoKeys)) {
+          return k.coverPhotoKeys;
+        }
+        if (k.coverPhotoKey) {
+          return [k.coverPhotoKey];
+        }
+        return [];
+      };
+      
+      return {
+        tags: [],
+        ...k,
+        coverPhotoKeys: getCoverPhotoKeys(),
+        tags: k.tags || [],
+      };
+    }),
   };
 
   // 2) 再恢复图片到 IndexedDB（key 不变）

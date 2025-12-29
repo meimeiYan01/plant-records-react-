@@ -65,16 +65,19 @@ export function KnowledgeTab({ knowledges, getUrlForKey, onAdd, onEdit, onDelete
   }, [knowledges, filterType, searchText, advancedFilters]);
 
 
-  function handleImageClick(knowledge) {
-    if (knowledge.coverPhotoKey) {
-      const images = [
-        {
-          key: knowledge.coverPhotoKey,
-          ext: "jpg",
-          filename: `${knowledge.title}-cover.jpg`,
-        },
-      ];
-      openImageViewer(images, 0);
+  function handleImageClick(knowledge, index = 0) {
+    // 兼容旧数据：coverPhotoKey（单个）和 coverPhotoKeys（数组）
+    const photoKeys = knowledge.coverPhotoKeys && Array.isArray(knowledge.coverPhotoKeys) 
+      ? knowledge.coverPhotoKeys 
+      : (knowledge.coverPhotoKey ? [knowledge.coverPhotoKey] : []);
+    
+    if (photoKeys.length > 0) {
+      const images = photoKeys.map((key, idx) => ({
+        key,
+        ext: "jpg",
+        filename: `${knowledge.title || "知识"}-${idx + 1}.jpg`,
+      }));
+      openImageViewer(images, index);
     }
   }
 
@@ -205,12 +208,23 @@ export function KnowledgeTab({ knowledges, getUrlForKey, onAdd, onEdit, onDelete
 // 知识卡片组件
 function KnowledgeCard({ knowledge, getUrlForKey, onEdit, onDelete, handleImageClick, handleUrlClick }) {
   const [expanded, setExpanded] = useState(false);
-  const knowledgeType = KNOWLEDGE_TYPES.find((t) => t.key === knowledge.type);
-  const isMarkdown = knowledge.type === "markdown";
-  const isWebType = knowledge.type !== "markdown" && knowledge.url;
   
-  // 对于非markdown类型，内容预览
-  const contentPreview = !isMarkdown && knowledge.content && knowledge.content.length > 150 
+  // 兼容旧数据：将旧类型映射到新类型
+  const getNormalizedType = (type) => {
+    if (type === "markdown") return "document";
+    if (type === "article" || type === "video" || type === "xiaohongshu") return "web";
+    return type || "document";
+  };
+  
+  const normalizedType = getNormalizedType(knowledge.type);
+  const knowledgeType = KNOWLEDGE_TYPES.find((t) => t.key === normalizedType);
+  // 如果找不到类型，默认使用第一个（文档）
+  const displayType = knowledgeType || KNOWLEDGE_TYPES[0];
+  const isDocument = normalizedType === "document";
+  const isWebType = normalizedType === "web" && knowledge.url;
+  
+  // 对于非文档类型，内容预览
+  const contentPreview = !isDocument && knowledge.content && knowledge.content.length > 150 
     ? knowledge.content.slice(0, 150) + "..." 
     : knowledge.content;
 
@@ -225,38 +239,89 @@ function KnowledgeCard({ knowledge, getUrlForKey, onEdit, onDelete, handleImageC
     }
   }
 
+  // 兼容旧数据：获取图片keys数组
+  const getPhotoKeys = () => {
+    if (knowledge.coverPhotoKeys && Array.isArray(knowledge.coverPhotoKeys)) {
+      return knowledge.coverPhotoKeys;
+    }
+    if (knowledge.coverPhotoKey) {
+      return [knowledge.coverPhotoKey];
+    }
+    return [];
+  };
+  
+  const photoKeys = getPhotoKeys();
+
   return (
     <div className="rounded-2xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 shadow-sm transition hover:shadow-md overflow-hidden">
       {/* 网页类型：封面图在顶部 */}
-      {isWebType && knowledge.coverPhotoKey && (
-        <div
-          className="cursor-pointer w-full h-48 overflow-hidden bg-zinc-100 dark:bg-zinc-700"
-          onClick={() => handleImageClick(knowledge)}
-        >
-          <ImageFromIdb
-            imgKey={knowledge.coverPhotoKey}
-            getUrlForKey={getUrlForKey}
-            alt="cover"
-            className="w-full h-full object-cover hover:opacity-90 transition"
-          />
+      {isWebType && photoKeys.length > 0 && (
+        <div className="w-full h-48 overflow-hidden bg-zinc-100 dark:bg-zinc-700">
+          {photoKeys.length === 1 ? (
+            <div
+              className="cursor-pointer w-full h-full"
+              onClick={() => handleImageClick(knowledge, 0)}
+            >
+              <ImageFromIdb
+                imgKey={photoKeys[0]}
+                getUrlForKey={getUrlForKey}
+                alt="cover"
+                className="w-full h-full object-cover hover:opacity-90 transition"
+              />
+            </div>
+          ) : (
+            <div className="flex h-full overflow-x-auto snap-x snap-mandatory scrollbar-hide">
+              {photoKeys.map((key, idx) => (
+                <div
+                  key={key}
+                  className="cursor-pointer shrink-0 w-full h-full snap-center"
+                  onClick={() => handleImageClick(knowledge, idx)}
+                >
+                  <ImageFromIdb
+                    imgKey={key}
+                    getUrlForKey={getUrlForKey}
+                    alt={`cover ${idx + 1}`}
+                    className="w-full h-full object-cover hover:opacity-90 transition"
+                  />
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
       <div className="p-4">
         {/* 头部 */}
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
             <div className="flex items-center gap-2 flex-wrap">
-              <Badge>{knowledgeType ? `${knowledgeType.icon} ${knowledgeType.label}` : knowledge.type}</Badge>
+              <Badge>{displayType ? `${displayType.icon} ${displayType.label}` : "知识"}</Badge>
               <span className="text-xs text-zinc-500 dark:text-zinc-400">{formatDateTime(knowledge.createdAt)}</span>
-              {knowledge.coverPhotoKey && !isWebType && (
-                <span className="text-xs text-zinc-400 dark:text-zinc-500">📷</span>
+              {photoKeys.length > 0 && !isWebType && (
+                <span className="text-xs text-zinc-400 dark:text-zinc-500">📷 {photoKeys.length > 1 ? photoKeys.length : ""}</span>
               )}
             </div>
-            <div className="mt-2 text-base font-semibold text-zinc-900 dark:text-zinc-100">{knowledge.title}</div>
+            <div className="flex items-center gap-1 shrink-0">
+              <Button
+                variant="secondary"
+                onClick={() => onEdit(knowledge.id)}
+                className="text-xs px-2 py-1 h-6"
+              >
+                编辑
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => onDelete(knowledge.id)}
+                className="text-xs px-2 py-1 h-6 text-red-600 hover:text-red-700"
+              >
+                删除
+              </Button>
+            </div>
+          </div>
+          <div className="mt-2 text-base font-semibold text-zinc-900 dark:text-zinc-100">{knowledge.title}</div>
             
             {/* Markdown内容渲染 */}
-            {isMarkdown && knowledge.content && (
+            {isDocument && knowledge.content && (
               <div className="mt-2">
                 {expanded ? (
                   <MarkdownRenderer content={knowledge.content} />
@@ -284,8 +349,8 @@ function KnowledgeCard({ knowledge, getUrlForKey, onEdit, onDelete, handleImageC
               </div>
             )}
 
-            {/* 非Markdown类型的内容 */}
-            {!isMarkdown && knowledge.content && (
+            {/* 非文档类型的内容 */}
+            {!isDocument && knowledge.content && (
               <div className="mt-2 text-sm text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap">
                 {expanded ? knowledge.content : contentPreview}
                 {knowledge.content.length > 150 && (
@@ -322,23 +387,6 @@ function KnowledgeCard({ knowledge, getUrlForKey, onEdit, onDelete, handleImageC
             {knowledge.source && (
               <div className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">来源：{knowledge.source}</div>
             )}
-          </div>
-          <div className="flex flex-col gap-1 shrink-0">
-            <Button
-              variant="secondary"
-              onClick={() => onEdit(knowledge.id)}
-              className="text-xs px-2 py-1"
-            >
-              编辑
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={() => onDelete(knowledge.id)}
-              className="text-xs px-2 py-1 text-red-600 hover:text-red-700"
-            >
-              删除
-            </Button>
-          </div>
         </div>
 
         {/* 标签 */}
@@ -350,20 +398,39 @@ function KnowledgeCard({ knowledge, getUrlForKey, onEdit, onDelete, handleImageC
           </div>
         )}
 
-        {/* Markdown类型：封面图在底部 */}
-        {isMarkdown && knowledge.coverPhotoKey && (
+        {/* 文档类型：封面图在底部 */}
+        {isDocument && photoKeys.length > 0 && (
           <div className="mt-3">
-            <div
-              className="cursor-pointer rounded-xl overflow-hidden"
-              onClick={() => handleImageClick(knowledge)}
-            >
-              <ImageFromIdb
-                imgKey={knowledge.coverPhotoKey}
-                getUrlForKey={getUrlForKey}
-                alt="cover"
-                className="w-full h-48 object-cover hover:opacity-90 transition"
-              />
-            </div>
+            {photoKeys.length === 1 ? (
+              <div
+                className="cursor-pointer rounded-xl overflow-hidden"
+                onClick={() => handleImageClick(knowledge, 0)}
+              >
+                <ImageFromIdb
+                  imgKey={photoKeys[0]}
+                  getUrlForKey={getUrlForKey}
+                  alt="cover"
+                  className="w-full h-48 object-cover hover:opacity-90 transition"
+                />
+              </div>
+            ) : (
+              <div className="flex gap-2 overflow-x-auto snap-x snap-mandatory scrollbar-hide pb-2">
+                {photoKeys.map((key, idx) => (
+                  <div
+                    key={key}
+                    className="cursor-pointer shrink-0 rounded-xl overflow-hidden snap-center"
+                    onClick={() => handleImageClick(knowledge, idx)}
+                  >
+                    <ImageFromIdb
+                      imgKey={key}
+                      getUrlForKey={getUrlForKey}
+                      alt={`cover ${idx + 1}`}
+                      className="h-48 w-auto object-cover hover:opacity-90 transition"
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>

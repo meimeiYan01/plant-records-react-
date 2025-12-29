@@ -2,44 +2,55 @@ import { useEffect, useState } from "react";
 import { Modal } from "../ui/Modal";
 import { Button } from "../ui/Button";
 import { ImageFromIdb } from "../ui/ImageFromIdb";
-import { saveImageToIdb, deleteImageFromIdb, MAX_IMAGE_BYTES, KNOWLEDGE_TYPES, KNOWLEDGE_TAGS, uid } from "../../utils";
+import { saveImageToIdb, deleteImageFromIdb, MAX_IMAGE_BYTES, KNOWLEDGE_TYPES, KNOWLEDGE_TAGS, KNOWLEDGE_SOURCES, uid } from "../../utils";
 import { createKnowledge } from "../../services/knowledgeService";
 
 export function AddKnowledgeModal({ getUrlForKey, onClose, onCreate }) {
-  const [type, setType] = useState("markdown");
+  const [type, setType] = useState("document");
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [url, setUrl] = useState("");
   const [tags, setTags] = useState([]);
   const [source, setSource] = useState("");
-  const [coverPhotoKey, setCoverPhotoKey] = useState("");
-  const [previewUrl, setPreviewUrl] = useState("");
+  const [customSource, setCustomSource] = useState("");
+  const [coverPhotoKeys, setCoverPhotoKeys] = useState([]);
+  const [previewUrls, setPreviewUrls] = useState({});
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     return () => {
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      Object.values(previewUrls).forEach((url) => {
+        if (url) URL.revokeObjectURL(url);
+      });
     };
-  }, [previewUrl]);
+  }, [previewUrls]);
 
   function toggleTag(t) {
     setTags((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]));
   }
 
   async function handlePickCover(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
 
-    if (file.size > MAX_IMAGE_BYTES) {
-      alert(`图片太大（>${Math.floor(MAX_IMAGE_BYTES / 1024 / 1024)}MB），建议换小一点的图。`);
-      return;
+    const validFiles = files.filter((file) => file.size <= MAX_IMAGE_BYTES);
+    if (validFiles.length !== files.length) {
+      alert(`部分图片太大（>${Math.floor(MAX_IMAGE_BYTES / 1024 / 1024)}MB），已跳过。`);
     }
 
     setLoading(true);
     try {
-      const key = await saveImageToIdb(file);
-      setCoverPhotoKey(key);
-      setPreviewUrl(URL.createObjectURL(file));
+      const newKeys = [];
+      const newUrls = { ...previewUrls };
+
+      for (const file of validFiles) {
+        const key = await saveImageToIdb(file);
+        newKeys.push(key);
+        newUrls[key] = URL.createObjectURL(file);
+      }
+
+      setCoverPhotoKeys((prev) => [...prev, ...newKeys]);
+      setPreviewUrls(newUrls);
     } catch (err) {
       alert(String(err.message || err));
     } finally {
@@ -48,26 +59,27 @@ export function AddKnowledgeModal({ getUrlForKey, onClose, onCreate }) {
     }
   }
 
-  async function removeCover() {
-    if (coverPhotoKey) {
-      await deleteImageFromIdb(coverPhotoKey);
-      setCoverPhotoKey("");
-    }
-    if (previewUrl) {
-      URL.revokeObjectURL(previewUrl);
-      setPreviewUrl("");
+  async function removeCover(keyToRemove) {
+    await deleteImageFromIdb(keyToRemove);
+    setCoverPhotoKeys((prev) => prev.filter((k) => k !== keyToRemove));
+    if (previewUrls[keyToRemove]) {
+      URL.revokeObjectURL(previewUrls[keyToRemove]);
+      setPreviewUrls((prev) => {
+        const next = { ...prev };
+        delete next[keyToRemove];
+        return next;
+      });
     }
   }
 
   function handleCreate() {
-    if (!title.trim()) {
-      alert("请输入标题");
-      return;
-    }
-    if (type !== "markdown" && !url.trim()) {
+    if (type === "web" && !url.trim()) {
       alert("请输入URL");
       return;
     }
+
+    // 处理来源：如果是自定义，使用自定义输入的值
+    const finalSource = source === "custom" ? customSource.trim() : (source ? KNOWLEDGE_SOURCES.find(s => s.key === source)?.label || source : "");
 
     const knowledge = createKnowledge({
       id: uid("knowledge"),
@@ -76,13 +88,15 @@ export function AddKnowledgeModal({ getUrlForKey, onClose, onCreate }) {
       content: content.trim(),
       url: url.trim(),
       tags,
-      source: source.trim(),
-      coverPhotoKey,
+      source: finalSource,
+      coverPhotoKeys,
     });
     onCreate(knowledge);
   }
 
   const knowledgeType = KNOWLEDGE_TYPES.find((t) => t.key === type);
+  const isDocument = type === "document";
+  const isWeb = type === "web";
 
   return (
     <Modal title="新建知识" onClose={onClose}>
@@ -103,16 +117,16 @@ export function AddKnowledgeModal({ getUrlForKey, onClose, onCreate }) {
         </div>
 
         <div>
-          <div className="mb-1 text-xs text-zinc-500 dark:text-zinc-400">标题 *</div>
+          <div className="mb-1 text-xs text-zinc-500 dark:text-zinc-400">标题（可选）</div>
           <input
             className="w-full rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 outline-none focus:border-zinc-900 dark:focus:border-zinc-600"
-            placeholder="输入知识标题"
+            placeholder="输入知识标题（可选）"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
           />
         </div>
 
-        {type === "markdown" ? (
+        {isDocument ? (
           <div>
             <div className="mb-1 text-xs text-zinc-500 dark:text-zinc-400">Markdown内容</div>
             <textarea
@@ -150,12 +164,26 @@ export function AddKnowledgeModal({ getUrlForKey, onClose, onCreate }) {
 
         <div>
           <div className="mb-1 text-xs text-zinc-500 dark:text-zinc-400">来源（可选）</div>
-          <input
-            className="w-full rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 outline-none focus:border-zinc-900 dark:focus:border-zinc-600"
-            placeholder="例如：B站、知乎、小红书等"
+          <select
+            className="w-full rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 outline-none focus:border-zinc-900 dark:focus:border-zinc-600"
             value={source}
             onChange={(e) => setSource(e.target.value)}
-          />
+          >
+            <option value="">无</option>
+            {KNOWLEDGE_SOURCES.map((s) => (
+              <option key={s.key} value={s.key}>
+                {s.label}
+              </option>
+            ))}
+          </select>
+          {source === "custom" && (
+            <input
+              className="mt-2 w-full rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 outline-none focus:border-zinc-900 dark:focus:border-zinc-600"
+              placeholder="输入自定义来源"
+              value={customSource}
+              onChange={(e) => setCustomSource(e.target.value)}
+            />
+          )}
         </div>
 
         <div>
@@ -179,32 +207,36 @@ export function AddKnowledgeModal({ getUrlForKey, onClose, onCreate }) {
         </div>
 
         <div>
-          <div className="mb-1 text-xs text-zinc-500 dark:text-zinc-400">封面图（可选）</div>
-          <input type="file" accept="image/*" onChange={handlePickCover} />
+          <div className="mb-1 text-xs text-zinc-500 dark:text-zinc-400">封面图（可选，可多选）</div>
+          <input type="file" accept="image/*" multiple onChange={handlePickCover} />
           {loading && <div className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">保存中…</div>}
-          {coverPhotoKey && (
-            <div className="mt-2 relative inline-block">
-              {previewUrl ? (
-                <img
-                  src={previewUrl}
-                  alt="cover preview"
-                  className="h-32 w-auto rounded-xl border border-zinc-200 dark:border-zinc-700 object-cover"
-                />
-              ) : (
-                <ImageFromIdb
-                  imgKey={coverPhotoKey}
-                  getUrlForKey={getUrlForKey}
-                  alt="cover"
-                  className="h-32 w-auto rounded-xl border border-zinc-200 dark:border-zinc-700 object-cover"
-                />
-              )}
-              <button
-                type="button"
-                onClick={removeCover}
-                className="absolute right-1 top-1 rounded-full bg-black/50 p-1 text-white hover:bg-black/70"
-              >
-                ✕
-              </button>
+          {coverPhotoKeys.length > 0 && (
+            <div className="mt-2 flex gap-2 overflow-x-auto pb-2">
+              {coverPhotoKeys.map((key) => (
+                <div key={key} className="relative shrink-0">
+                  {previewUrls[key] ? (
+                    <img
+                      src={previewUrls[key]}
+                      alt="cover preview"
+                      className="h-32 w-auto rounded-xl border border-zinc-200 dark:border-zinc-700 object-cover"
+                    />
+                  ) : (
+                    <ImageFromIdb
+                      imgKey={key}
+                      getUrlForKey={getUrlForKey}
+                      alt="cover"
+                      className="h-32 w-auto rounded-xl border border-zinc-200 dark:border-zinc-700 object-cover"
+                    />
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => removeCover(key)}
+                    className="absolute right-1 top-1 rounded-full bg-black/50 p-1 text-white hover:bg-black/70"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
             </div>
           )}
         </div>

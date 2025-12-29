@@ -415,10 +415,14 @@ export default function App() {
     const knowledge = state.knowledges?.find((k) => k.id === knowledgeId);
     if (!knowledge) return;
 
-    // 删除关联的封面图
-    if (knowledge.coverPhotoKey) {
-      removeImageKey(knowledge.coverPhotoKey).catch(() => {});
-    }
+    // 删除关联的封面图（兼容旧数据）
+    const photoKeys = knowledge.coverPhotoKeys && Array.isArray(knowledge.coverPhotoKeys)
+      ? knowledge.coverPhotoKeys
+      : (knowledge.coverPhotoKey ? [knowledge.coverPhotoKey] : []);
+    
+    photoKeys.forEach((key) => {
+      if (key) removeImageKey(key).catch(() => {});
+    });
 
     setState((s) => ({
       ...s,

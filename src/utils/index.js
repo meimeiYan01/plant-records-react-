@@ -55,10 +55,17 @@ export const EXPENSE_TAGS = ["必需品", "升级", "补充", "一次性", "定�
 
 // 知识类型
 export const KNOWLEDGE_TYPES = [
-  { key: "markdown", label: "Markdown文档", icon: "📝" },
-  { key: "article", label: "网页文章", icon: "📄" },
-  { key: "video", label: "网页视频", icon: "🎥" },
-  { key: "xiaohongshu", label: "小红书笔记", icon: "📱" },
+  { key: "document", label: "文档", icon: "📝" },
+  { key: "web", label: "网络资源", icon: "🌐" },
+];
+
+// 知识来源选项
+export const KNOWLEDGE_SOURCES = [
+  { key: "xiaohongshu", label: "小红书" },
+  { key: "douyin", label: "抖音" },
+  { key: "bilibili", label: "B站" },
+  { key: "doubao", label: "豆包" },
+  { key: "custom", label: "自定义" },
 ];
 
 // 知识标签（常用）
