@@ -22,7 +22,6 @@ export const LOG_TYPES = [
   { key: "weekly", label: "周报" },
   { key: "monthly", label: "月报" },
   { key: "todo", label: "待办" },
-  { key: "custom", label: "自定义" },
 ];
 
 // 花费类型
