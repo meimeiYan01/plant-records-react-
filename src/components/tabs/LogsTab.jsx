@@ -4,7 +4,7 @@ import { formatDateTime, formatDate, LOG_TYPES } from "../../utils";
 import { ImageViewer } from "../ui/ImageViewer";
 import { AdvancedFilter } from "../ui/AdvancedFilter";
 
-export function LogsTab({ logs, plants, getUrlForKey, onAdd, onEdit, onDelete, openImageViewer }) {
+export function LogsTab({ logs, plants, getUrlForKey, onAdd, onEdit, onDelete, openImageViewer, onUpdate }) {
   const [filterType, setFilterType] = useState("all");
   const [searchText, setSearchText] = useState("");
   const [viewMode, setViewMode] = useState("list"); // "list" | "timeline"
@@ -25,9 +25,14 @@ export function LogsTab({ logs, plants, getUrlForKey, onAdd, onEdit, onDelete, o
   const filteredLogs = useMemo(() => {
     let result = [...logs];
 
-    // 基础类型筛选
-    if (filterType !== "all") {
+    // 基础类型筛选（包括待办类型）
+    if (filterType !== "all" && filterType !== "pinned") {
       result = result.filter((log) => log.type === filterType);
+    }
+
+    // 置顶筛选
+    if (filterType === "pinned") {
+      result = result.filter((log) => log.isPinned === true);
     }
 
     // 文本搜索
@@ -66,7 +71,24 @@ export function LogsTab({ logs, plants, getUrlForKey, onAdd, onEdit, onDelete, o
       result = result.filter((log) => !log.photos || log.photos.length === 0);
     }
 
-    return result.sort((a, b) => new Date(b.date) - new Date(a.date));
+    // 排序逻辑：置顶优先，然后按时间倒序
+    return result.sort((a, b) => {
+      // 置顶优先
+      const aPinned = a.isPinned ?? false;
+      const bPinned = b.isPinned ?? false;
+      if (aPinned && !bPinned) return -1;
+      if (!aPinned && bPinned) return 1;
+      
+      // 如果都是置顶，按置顶时间倒序
+      if (aPinned && bPinned) {
+        const aPinnedAt = a.pinnedAt ? new Date(a.pinnedAt).getTime() : 0;
+        const bPinnedAt = b.pinnedAt ? new Date(b.pinnedAt).getTime() : 0;
+        if (bPinnedAt !== aPinnedAt) return bPinnedAt - aPinnedAt;
+      }
+      
+      // 按日期倒序
+      return new Date(b.date) - new Date(a.date);
+    });
   }, [logs, filterType, searchText, advancedFilters]);
 
   // 按日期分组（用于时间线视图）
@@ -161,6 +183,16 @@ export function LogsTab({ logs, plants, getUrlForKey, onAdd, onEdit, onDelete, o
                 {t.label}
               </button>
             ))}
+            <button
+              onClick={() => setFilterType("pinned")}
+              className={`shrink-0 rounded-full border px-3 py-1 text-xs transition ${
+                filterType === "pinned"
+                  ? "border-zinc-900 dark:border-zinc-600 bg-zinc-900 dark:bg-zinc-700 text-white dark:text-zinc-100"
+                  : "border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700"
+              }`}
+            >
+              📌 置顶
+            </button>
           </div>
           <button
             onClick={() => setShowAdvancedFilter(true)}
@@ -249,6 +281,7 @@ export function LogsTab({ logs, plants, getUrlForKey, onAdd, onEdit, onDelete, o
                     getUrlForKey={getUrlForKey}
                     onEdit={onEdit}
                     onDelete={onDelete}
+                    onUpdate={onUpdate}
                     handleImageClick={handleImageClick}
                   />
                 ))}
@@ -268,6 +301,7 @@ export function LogsTab({ logs, plants, getUrlForKey, onAdd, onEdit, onDelete, o
               getUrlForKey={getUrlForKey}
               onEdit={onEdit}
               onDelete={onDelete}
+              onUpdate={onUpdate}
               handleImageClick={handleImageClick}
             />
           ))}
@@ -298,29 +332,110 @@ export function LogsTab({ logs, plants, getUrlForKey, onAdd, onEdit, onDelete, o
 }
 
 // 日志卡片组件（优化后的布局）
-function LogCard({ log, plants, getPlantNames, getUrlForKey, onEdit, onDelete, handleImageClick }) {
+function LogCard({ log, plants, getPlantNames, getUrlForKey, onEdit, onDelete, onUpdate, handleImageClick }) {
   const [expanded, setExpanded] = useState(false);
   const relatedPlantNames = getPlantNames(log.relatedPlants);
   const logType = LOG_TYPES.find((t) => t.key === log.type);
   const contentPreview = log.content && log.content.length > 100 ? log.content.slice(0, 100) + "..." : log.content;
+  const isTodo = log.type === "todo";
+  const isCompleted = log.isCompleted ?? false;
+  const isPinned = log.isPinned ?? false;
+
+  function handleTogglePinned() {
+    if (!onUpdate) return;
+    const updated = {
+      ...log,
+      isPinned: !isPinned,
+      pinnedAt: !isPinned ? new Date().toISOString() : undefined,
+    };
+    onUpdate(updated);
+  }
+
+  function handleToggleCompleted() {
+    if (!onUpdate || !isTodo) return;
+    const updated = {
+      ...log,
+      isCompleted: !isCompleted,
+      completedAt: !isCompleted ? new Date().toISOString() : undefined,
+    };
+    onUpdate(updated);
+  }
 
   return (
-    <div className="rounded-2xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-4 shadow-sm transition hover:shadow-md">
+    <div className={`rounded-2xl border p-4 shadow-sm transition hover:shadow-md ${
+      isPinned 
+        ? "border-blue-400 dark:border-blue-600 bg-blue-50/50 dark:bg-blue-900/20" 
+        : isTodo && !isCompleted
+        ? "border-orange-300 dark:border-orange-600 bg-orange-50/50 dark:bg-orange-900/20"
+        : isTodo && isCompleted
+        ? "border-zinc-300 dark:border-zinc-600 bg-zinc-100/50 dark:bg-zinc-700/50"
+        : "border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800"
+    }`}>
       {/* 头部 */}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 flex-wrap">
-            <Badge>{logType?.label || log.type}</Badge>
-            <span className="text-xs text-zinc-500 dark:text-zinc-400">{formatDateTime(log.date)}</span>
-            {log.photos && log.photos.length > 0 && (
-              <span className="text-xs text-zinc-400 dark:text-zinc-500">📷 {log.photos.length}</span>
-            )}
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex items-center gap-2 flex-wrap">
+              {isPinned && <span className="text-sm" title="已置顶">📌</span>}
+              {isTodo && (
+                <span className="text-sm" title={isCompleted ? "已完成" : "待办事项"}>
+                  {isCompleted ? "✅" : "📋"}
+                </span>
+              )}
+              <Badge>{logType?.label || log.type}</Badge>
+              <span className="text-xs text-zinc-500 dark:text-zinc-400">{formatDateTime(log.date)}</span>
+              {isTodo && (
+                <button
+                  onClick={handleToggleCompleted}
+                  className="text-xs px-1.5 py-0.5 rounded border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition"
+                  title={isCompleted ? "标记为未完成" : "标记为已完成"}
+                >
+                  {isCompleted ? "↩️" : "✅"}
+                </button>
+              )}
+              <button
+                onClick={handleTogglePinned}
+                className="text-xs px-1.5 py-0.5 rounded border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition"
+                title={isPinned ? "取消置顶" : "置顶"}
+              >
+                {isPinned ? "📌" : "📌"}
+              </button>
+              {log.photos && log.photos.length > 0 && (
+                <span className="text-xs text-zinc-400 dark:text-zinc-500">📷 {log.photos.length}</span>
+              )}
+            </div>
+            <div className="flex items-center gap-1 shrink-0">
+              <button
+                onClick={() => onEdit(log.id)}
+                className="text-xs px-2.5 py-1 rounded-md bg-slate-400 hover:bg-slate-500 dark:bg-slate-500 dark:hover:bg-slate-600 text-white transition-colors font-medium"
+                title="编辑"
+              >
+                编辑
+              </button>
+              <button
+                onClick={() => onDelete(log.id)}
+                className="text-xs px-2.5 py-1 rounded-md bg-rose-400 hover:bg-rose-500 dark:bg-rose-500 dark:hover:bg-rose-600 text-white transition-colors font-medium"
+                title="删除"
+              >
+                删除
+              </button>
+            </div>
           </div>
           {log.title && (
-            <div className="mt-2 text-base font-semibold text-zinc-900 dark:text-zinc-100">{log.title}</div>
+            <div className={`mt-2 text-base font-semibold ${
+              isTodo && isCompleted 
+                ? "text-zinc-500 dark:text-zinc-400 line-through" 
+                : "text-zinc-900 dark:text-zinc-100"
+            }`}>
+              {log.title}
+            </div>
           )}
           {log.content && (
-            <div className="mt-2 text-sm text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap">
+            <div className={`mt-2 text-sm whitespace-pre-wrap ${
+              isTodo && isCompleted 
+                ? "text-zinc-500 dark:text-zinc-400 line-through" 
+                : "text-zinc-700 dark:text-zinc-300"
+            }`}>
               {expanded ? log.content : contentPreview}
               {log.content.length > 100 && (
                 <button
@@ -332,22 +447,6 @@ function LogCard({ log, plants, getPlantNames, getUrlForKey, onEdit, onDelete, h
               )}
             </div>
           )}
-        </div>
-        <div className="flex flex-col gap-1 shrink-0">
-          <Button
-            variant="secondary"
-            onClick={() => onEdit(log.id)}
-            className="text-xs px-2 py-1"
-          >
-            编辑
-          </Button>
-          <Button
-            variant="secondary"
-            onClick={() => onDelete(log.id)}
-            className="text-xs px-2 py-1 text-red-600 hover:text-red-700"
-          >
-            删除
-          </Button>
         </div>
       </div>
 

@@ -607,6 +607,7 @@ export default function App() {
                 name: state.generalLogs?.find((l) => l.id === id)?.title || "日志",
               })
             }
+            onUpdate={updateLog}
             openImageViewer={openImageViewer}
           />
         )}

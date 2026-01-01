@@ -18,9 +18,10 @@ export const MAX_IMAGE_BYTES = 8 * 1024 * 1024; // 8MB
 
 // 日志类型
 export const LOG_TYPES = [
-  { key: "daily", label: "日常日志" },
+  { key: "daily", label: "日记" },
   { key: "weekly", label: "周报" },
   { key: "monthly", label: "月报" },
+  { key: "todo", label: "待办" },
   { key: "custom", label: "自定义" },
 ];
 

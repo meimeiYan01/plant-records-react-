@@ -15,6 +15,23 @@ export function createLog(log) {
     ? (log.mood.length > 0 ? log.mood[0] : "") 
     : (log.mood || "");
   
+  // 置顶字段处理（向后兼容）
+  const isPinned = log.isPinned ?? false;
+  
+  // 待办事项完成状态处理（仅当 type === "todo" 时有效）
+  const isTodo = log.type === "todo";
+  const isCompleted = isTodo ? (log.isCompleted ?? false) : false;
+  
+  // 如果标记为已完成，记录完成时间（仅待办事项）
+  const completedAt = isTodo && isCompleted && !log.completedAt 
+    ? new Date().toISOString() 
+    : (log.completedAt || undefined);
+  
+  // 如果标记为置顶，记录置顶时间
+  const pinnedAt = isPinned && !log.pinnedAt 
+    ? new Date().toISOString() 
+    : (log.pinnedAt || undefined);
+  
   return {
     id: log.id || `log_${Date.now()}_${Math.random().toString(16).slice(2)}`,
     type: log.type || "daily",
@@ -26,6 +43,10 @@ export function createLog(log) {
     weather: weather,
     mood: mood,
     relatedPlants: log.relatedPlants || [],
+    isCompleted: isCompleted,
+    completedAt: completedAt,
+    isPinned: isPinned,
+    pinnedAt: pinnedAt,
   };
 }
 
