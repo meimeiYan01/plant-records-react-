@@ -43,6 +43,11 @@ export function collectReferencedImageKeys(state) {
   const knowledgeKeys = collectKnowledgeImageKeys(state.knowledges || []);
   knowledgeKeys.forEach((k) => keys.add(k));
   
+  // 相机相册照片
+  for (const photo of state.cameraAlbum || []) {
+    if (photo.imageKey) keys.add(photo.imageKey);
+  }
+  
   return Array.from(keys);
 }
 
@@ -166,6 +171,7 @@ export async function importBackupZip(file) {
         tags: k.tags || [],
       };
     }),
+    cameraAlbum: state.cameraAlbum || [],
   };
 
   // 2) 再恢复图片到 IndexedDB（key 不变）

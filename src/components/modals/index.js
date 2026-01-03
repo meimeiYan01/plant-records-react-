@@ -10,4 +10,6 @@ export { AddKnowledgeModal } from "./AddKnowledgeModal";
 export { EditKnowledgeModal } from "./EditKnowledgeModal";
 export { DataPanelModal } from "./DataPanelModal";
 export { LocationManagerModal } from "./LocationManagerModal";
+export { CameraModal } from "./CameraModal";
+export { AlbumModal } from "./AlbumModal";
 

@@ -1,14 +1,15 @@
 import { useEffect, useState } from "react";
 import { Modal } from "../ui/Modal";
-import { Button } from "../ui/Button";
-import { saveImageToIdb, deleteImageFromIdb, MAX_IMAGE_BYTES, uid } from "../../utils";
+import { Button, ImagePicker } from "../ui";
+import { get as idbGet } from "idb-keyval";
+import { deleteImageFromIdb, uid } from "../../utils";
 
-export function AddPlantModal({ locations, onClose, onCreate }) {
+export function AddPlantModal({ locations, onClose, onCreate, album, getUrlForKey, onOpenAlbum }) {
   const [name, setName] = useState("");
   const [location, setLocation] = useState(locations[0] || "");
   const [coverKey, setCoverKey] = useState("");
   const [previewUrl, setPreviewUrl] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [isFromAlbum, setIsFromAlbum] = useState(false); // 标记图片是否来自相册
 
   useEffect(() => {
     return () => {
@@ -16,35 +17,55 @@ export function AddPlantModal({ locations, onClose, onCreate }) {
     };
   }, [previewUrl]);
 
-  async function handlePick(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (file.size > MAX_IMAGE_BYTES) {
-      alert(`图片太大（>${Math.floor(MAX_IMAGE_BYTES / 1024 / 1024)}MB）。先用小一点的图。`);
-      e.target.value = "";
-      return;
+  useEffect(() => {
+    async function loadPreview() {
+      if (coverKey) {
+        const blob = await idbGet(coverKey);
+        if (blob) {
+          const oldUrl = previewUrl;
+          const newUrl = URL.createObjectURL(blob);
+          setPreviewUrl(newUrl);
+          if (oldUrl) URL.revokeObjectURL(oldUrl);
+        } else {
+          if (previewUrl) {
+            URL.revokeObjectURL(previewUrl);
+            setPreviewUrl("");
+          }
+        }
+      } else {
+        if (previewUrl) {
+          URL.revokeObjectURL(previewUrl);
+          setPreviewUrl("");
+        }
+      }
     }
+    loadPreview();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [coverKey]);
 
-    setLoading(true);
-    try {
-      const key = await saveImageToIdb(file);
-      setCoverKey(key);
-
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
-      setPreviewUrl(URL.createObjectURL(file));
-    } catch (err) {
-      alert(String(err.message || err));
-    } finally {
-      setLoading(false);
+  function handleImageSelect(keys) {
+    if (keys && keys.length > 0) {
+      setCoverKey(keys[0]);
+      // 检查是否来自相册（通过检查 album 中是否有这个 key）
+      const isFromAlbumRef = album && album.some((p) => p.imageKey === keys[0]);
+      setIsFromAlbum(isFromAlbumRef);
     }
   }
 
+  function handleOpenAlbum(callback) {
+    // callback 是 ImagePicker 传递的回调函数
+    // 当用户选择照片后，callback 会被调用，然后通过 onSelect 传递 keys
+    // 所以这里只需要传递 callback 即可，不需要处理 keys
+    onOpenAlbum(callback);
+  }
+
   async function removePicked() {
-    if (coverKey) {
+    if (coverKey && !isFromAlbum) {
+      // 只有新上传的图片才删除，相册引用的图片不删除
       await deleteImageFromIdb(coverKey);
-      setCoverKey("");
     }
+    setCoverKey("");
+    setIsFromAlbum(false);
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewUrl("");
   }
@@ -79,11 +100,15 @@ export function AddPlantModal({ locations, onClose, onCreate }) {
 
         <div>
           <div className="mb-1 text-xs text-zinc-500">封面照片（可选）</div>
-          <input type="file" accept="image/*" onChange={handlePick} />
+          <ImagePicker
+            onSelect={handleImageSelect}
+            multiple={false}
+            album={album || []}
+            getUrlForKey={getUrlForKey}
+            onOpenAlbum={handleOpenAlbum}
+          />
           <div className="mt-2">
-            {loading ? (
-              <div className="text-sm text-zinc-500">保存中…</div>
-            ) : previewUrl ? (
+            {previewUrl ? (
               <div className="flex items-center gap-3">
                 <img src={previewUrl} alt="preview" className="h-24 w-24 rounded-2xl border object-cover" />
                 <Button variant="secondary" onClick={removePicked}>

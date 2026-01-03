@@ -10,6 +10,7 @@ export function HomeTab({
   onAddLog,
   onLogClick,
   onAddPlant,
+  onOpenCamera,
   openImageViewer,
 }) {
   // 获取最近的日志（最多5条）
@@ -19,6 +20,18 @@ export function HomeTab({
 
   return (
     <div className="space-y-6 pb-20">
+      {/* 多肉相机入口 */}
+      <div>
+        <button
+          onClick={onOpenCamera}
+          className="w-full rounded-2xl border-2 border-dashed border-zinc-300 dark:border-zinc-700 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-zinc-800 dark:to-zinc-900 p-6 text-center transition hover:border-zinc-900 dark:hover:border-zinc-600 hover:shadow-md"
+        >
+          <div className="text-4xl mb-2">📷</div>
+          <div className="text-base font-semibold text-zinc-900 dark:text-zinc-100">多肉相机</div>
+          <div className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">拍照记录，自动添加水印</div>
+        </button>
+      </div>
+
       {/* 上半部分：所有多肉的小头像 */}
       <div>
         <div className="mb-3 flex items-center justify-between">

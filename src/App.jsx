@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { usePwaInstall, useImageCache, useTheme } from "./hooks";
 import { Badge, Button, ImageFromIdb, ConfirmDialog, ImageViewer, TabBar } from "./components/ui";
 import {
@@ -14,9 +14,11 @@ import {
   EditKnowledgeModal,
   DataPanelModal,
   LocationManagerModal,
+  CameraModal,
+  AlbumModal,
 } from "./components/modals";
-import { LogsTab, ExpensesTab, HomeTab, SettingsTab, PlantDetailTab, PlantsTab, KnowledgeTab } from "./components/tabs";
-import { loadState, saveState, daysSince, formatDateTime, LS_KEY, EVENT_TYPES, extFromMime } from "./utils";
+import { LogsTab, ExpensesTab, HomeTab, SettingsTab, PlantDetailTab, PlantsTab, KnowledgeTab, AlbumTab } from "./components/tabs";
+import { loadState, saveState, daysSince, formatDateTime, LS_KEY, EVENT_TYPES, extFromMime, uid } from "./utils";
 import { exportBackupZip, importBackupZip } from "./services/backupService";
 import { collectLogImageKeys } from "./services/logService";
 import { collectExpenseImageKeys } from "./services/expenseService";
@@ -42,6 +44,7 @@ export default function App() {
         generalLogs: loaded.generalLogs || [],
         expenses: loaded.expenses || [],
         knowledges: loaded.knowledges || [],
+        cameraAlbum: loaded.cameraAlbum || [],
       };
     }
     return {
@@ -51,10 +54,11 @@ export default function App() {
       generalLogs: [],
       expenses: [],
       knowledges: [],
+      cameraAlbum: [],
     };
   });
 
-  const [currentTab, setCurrentTab] = useState("home"); // home | plants | logs | expenses | knowledge | settings
+  const [currentTab, setCurrentTab] = useState("home"); // home | plants | album | logs | expenses | knowledge | settings
   const [selectedId, setSelectedId] = useState(null);
   const [showPlantDetail, setShowPlantDetail] = useState(false);
   const [plantDetailFromTab, setPlantDetailFromTab] = useState(null); // 记录从哪个标签页进入详情页
@@ -70,6 +74,11 @@ export default function App() {
   const [showEditKnowledge, setShowEditKnowledge] = useState(null); // knowledge id
   const [showDataPanel, setShowDataPanel] = useState(false);
   const [showLocationManager, setShowLocationManager] = useState(false);
+  const [showCamera, setShowCamera] = useState(false);
+  const [showAlbum, setShowAlbum] = useState(false);
+  const [albumSelectMode, setAlbumSelectMode] = useState(false);
+  const [albumSelectCallback, setAlbumSelectCallback] = useState(null);
+  const albumSelectCallbackRef = useRef(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null); // { type: 'plant'|'event'|'log'|'expense'|'knowledge', id, name }
   const [imageViewer, setImageViewer] = useState(null); // { images: [], currentIndex: 0 }
 
@@ -296,6 +305,32 @@ export default function App() {
 
   function updateLocations(newLocations) {
     setState((s) => ({ ...s, locations: newLocations }));
+  }
+
+  // 相册管理函数
+  function addPhotoToAlbum(imageKey) {
+    const photo = {
+      id: uid("photo"),
+      imageKey,
+      createdAt: new Date().toISOString(),
+    };
+    setState((s) => ({
+      ...s,
+      cameraAlbum: [photo, ...(s.cameraAlbum || [])],
+    }));
+  }
+
+  function deletePhotoFromAlbum(photoId) {
+    const photo = state.cameraAlbum?.find((p) => p.id === photoId);
+    if (photo) {
+      // 删除图片
+      removeImageKey(photo.imageKey).catch(() => {});
+      // 从相册中删除
+      setState((s) => ({
+        ...s,
+        cameraAlbum: (s.cameraAlbum || []).filter((p) => p.id !== photoId),
+      }));
+    }
   }
 
   // 日志管理函数
@@ -530,6 +565,7 @@ export default function App() {
             }}
             onAddPlant={() => setShowAddPlant(true)}
             onAddLog={() => setShowAddLog(true)}
+            onOpenCamera={() => setShowCamera(true)}
             openImageViewer={openImageViewer}
             onLogClick={(id) => {
               if (id === "all") {
@@ -541,56 +577,57 @@ export default function App() {
           />
         )}
 
-        {currentTab === "plants" && (
-          showPlantDetail && selectedId ? (
-            <PlantDetailTab
-              plant={selectedPlant}
-              events={events}
-              generalLogs={state.generalLogs || []}
-              getUrlForKey={getUrlForKey}
-              onEdit={() => setShowEditPlant(true)}
-              onDelete={() =>
-                setDeleteConfirm({
-                  type: "plant",
-                  id: selectedPlant.id,
-                  name: selectedPlant.name,
-                })
-              }
-              onAddEvent={() => setShowAddEvent(true)}
-              onEditEvent={(id) => setShowEditEvent(id)}
-              onDeleteEvent={(id) =>
-                setDeleteConfirm({
-                  type: "event",
-                  id,
-                  name: `${EVENT_TYPES.find((t) => t.key === state.events.find((e) => e.id === id)?.type)?.label || "事件"} - ${formatDateTime(state.events.find((e) => e.id === id)?.at)}`,
-                })
-              }
-              onEditLog={(id) => setShowEditLog(id)}
-              openImageViewer={openImageViewer}
-              onBack={() => {
+        {currentTab === "plants" && !showPlantDetail && (
+          <PlantsTab
+            plants={plantsSorted}
+            getUrlForKey={getUrlForKey}
+            onPlantClick={(id) => {
+              setSelectedId(id);
+              setShowPlantDetail(true);
+              setPlantDetailFromTab("plants");
+            }}
+            onAddPlant={() => setShowAddPlant(true)}
+            onOpenAlbum={() => setCurrentTab("album")}
+          />
+        )}
+
+        {currentTab === "plants" && showPlantDetail && selectedId && (
+          <PlantDetailTab
+            plant={selectedPlant}
+            events={events}
+            generalLogs={state.generalLogs || []}
+            getUrlForKey={getUrlForKey}
+            onEdit={() => setShowEditPlant(true)}
+            onDelete={() =>
+              setDeleteConfirm({
+                type: "plant",
+                id: selectedPlant.id,
+                name: selectedPlant.name,
+              })
+            }
+            onAddEvent={() => setShowAddEvent(true)}
+            onEditEvent={(id) => setShowEditEvent(id)}
+            onDeleteEvent={(id) =>
+              setDeleteConfirm({
+                type: "event",
+                id,
+                name: `${EVENT_TYPES.find((t) => t.key === state.events.find((e) => e.id === id)?.type)?.label || "事件"} - ${formatDateTime(state.events.find((e) => e.id === id)?.at)}`,
+              })
+            }
+            onEditLog={(id) => setShowEditLog(id)}
+            openImageViewer={openImageViewer}
+            onBack={() => {
+              setShowPlantDetail(false);
+              setSelectedId(null);
+              if (plantDetailFromTab === "home") {
+                setCurrentTab("home");
+              } else {
+                // 保持在 plants tab，但退出详情页
                 setShowPlantDetail(false);
-                setSelectedId(null);
-                if (plantDetailFromTab === "home") {
-                  setCurrentTab("home");
-                } else {
-                  // 保持在 plants tab，但退出详情页
-                  setShowPlantDetail(false);
-                }
-                setPlantDetailFromTab(null);
-              }}
-            />
-          ) : (
-            <PlantsTab
-              plants={plantsSorted}
-              getUrlForKey={getUrlForKey}
-              onPlantClick={(id) => {
-                setSelectedId(id);
-                setShowPlantDetail(true);
-                setPlantDetailFromTab("plants");
-              }}
-              onAddPlant={() => setShowAddPlant(true)}
-            />
-          )
+              }
+              setPlantDetailFromTab(null);
+            }}
+          />
         )}
 
         {currentTab === "logs" && (
@@ -647,6 +684,15 @@ export default function App() {
           />
         )}
 
+        {currentTab === "album" && (
+          <AlbumTab
+            album={state.cameraAlbum || []}
+            getUrlForKey={getUrlForKey}
+            openImageViewer={openImageViewer}
+            onDeletePhoto={deletePhotoFromAlbum}
+          />
+        )}
+
         {currentTab === "settings" && (
           <SettingsTab
             onLocationManager={() => setShowLocationManager(true)}
@@ -673,6 +719,15 @@ export default function App() {
       {showAddPlant && (
         <AddPlantModal
           locations={state.locations}
+          album={state.cameraAlbum || []}
+          getUrlForKey={getUrlForKey}
+          onOpenAlbum={(callback) => {
+            console.log("[App] onOpenAlbum (Plant) called with callback:", callback);
+            setAlbumSelectMode(true);
+            setAlbumSelectCallback(callback);
+            albumSelectCallbackRef.current = callback; // 同时保存到 ref
+            setShowAlbum(true);
+          }}
           onClose={() => setShowAddPlant(false)}
           onCreate={(p) => {
             addPlant(p);
@@ -746,7 +801,15 @@ export default function App() {
       {showAddLog && (
         <AddLogModal
           plants={state.plants}
+          album={state.cameraAlbum || []}
           getUrlForKey={getUrlForKey}
+          onOpenAlbum={(callback) => {
+            console.log("[App] onOpenAlbum (Log) called with callback:", callback);
+            setAlbumSelectMode(true);
+            setAlbumSelectCallback(callback);
+            albumSelectCallbackRef.current = callback; // 同时保存到 ref
+            setShowAlbum(true);
+          }}
           onClose={() => setShowAddLog(false)}
           onCreate={(log) => {
             addLog(log);
@@ -859,6 +922,49 @@ export default function App() {
           getUrlForKey={getUrlForKey}
           onClose={() => setImageViewer(null)}
           onViewDetail={imageViewer.onViewDetail}
+        />
+      )}
+
+      {showCamera && (
+        <CameraModal
+          onClose={() => setShowCamera(false)}
+          onCapture={(imageKey) => {
+            // 保存到相册
+            addPhotoToAlbum(imageKey);
+          }}
+        />
+      )}
+
+      {showAlbum && (
+        <AlbumModal
+          album={state.cameraAlbum || []}
+          getUrlForKey={getUrlForKey}
+          openImageViewer={openImageViewer}
+          onDeletePhoto={deletePhotoFromAlbum}
+          selectMode={albumSelectMode}
+          onClose={() => setShowAlbum(false)}
+          onSelectPhoto={(imageKeys) => {
+            console.log("[App] onSelectPhoto called with:", imageKeys, "albumSelectMode:", albumSelectMode, "hasCallback:", !!albumSelectCallback, "hasRefCallback:", !!albumSelectCallbackRef.current);
+            // 使用 ref 来获取最新的回调函数，避免闭包问题
+            const callback = albumSelectCallbackRef.current;
+            // 只有在选择模式下才处理回调
+            if (albumSelectMode && callback) {
+              // 调用回调函数，传递选择的图片keys（即使是空数组也要传递，表示取消选择）
+              const keys = imageKeys || [];
+              console.log("[App] Calling albumSelectCallback with keys:", keys);
+              try {
+                callback(keys);
+              } catch (error) {
+                console.error("[App] Error calling albumSelectCallback:", error);
+              }
+              setAlbumSelectMode(false);
+              setAlbumSelectCallback(null);
+              albumSelectCallbackRef.current = null; // 同时清空 ref
+            } else {
+              console.warn("[App] Cannot call callback:", { albumSelectMode, hasCallback: !!callback });
+            }
+            setShowAlbum(false);
+          }}
         />
       )}
           </div>

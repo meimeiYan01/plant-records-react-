@@ -6,13 +6,24 @@ export function PlantsTab({
   getUrlForKey,
   onPlantClick,
   onAddPlant,
+  onOpenAlbum,
 }) {
   return (
     <div className="space-y-4 pb-20">
       {/* 头部 */}
       <div className="flex items-center justify-between">
         <div className="text-base font-semibold text-zinc-900 dark:text-zinc-100">我的多肉</div>
-        <div className="text-xs text-zinc-500 dark:text-zinc-400">{plants.length} 盆</div>
+        <div className="flex items-center gap-3">
+          {onOpenAlbum && (
+            <button
+              onClick={onOpenAlbum}
+              className="rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-1.5 text-xs text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition"
+            >
+              📷 相册
+            </button>
+          )}
+          <div className="text-xs text-zinc-500 dark:text-zinc-400">{plants.length} 盆</div>
+        </div>
       </div>
 
       {/* 多肉卡片网格 */}

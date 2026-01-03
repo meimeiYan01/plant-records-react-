@@ -1,11 +1,10 @@
 import { useEffect, useState } from "react";
 import { Modal } from "../ui/Modal";
-import { Button } from "../ui/Button";
-import { ImageFromIdb } from "../ui/ImageFromIdb";
-import { saveImageToIdb, deleteImageFromIdb, MAX_IMAGE_BYTES, LOG_TYPES, LOG_TAGS, WEATHER_OPTIONS, MOOD_OPTIONS, uid } from "../../utils";
+import { Button, ImageFromIdb, ImagePicker } from "../ui";
+import { deleteImageFromIdb, LOG_TYPES, LOG_TAGS, WEATHER_OPTIONS, MOOD_OPTIONS, uid } from "../../utils";
 import { createLog } from "../../services/logService";
 
-export function AddLogModal({ plants, getUrlForKey, onClose, onCreate }) {
+export function AddLogModal({ plants, getUrlForKey, onClose, onCreate, album, onOpenAlbum }) {
   const [type, setType] = useState("daily");
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
@@ -15,7 +14,7 @@ export function AddLogModal({ plants, getUrlForKey, onClose, onCreate }) {
   const [relatedPlants, setRelatedPlants] = useState([]);
   const [photoKeys, setPhotoKeys] = useState([]);
   const [previewUrls, setPreviewUrls] = useState({});
-  const [loading, setLoading] = useState(false);
+  const [uploadedKeys, setUploadedKeys] = useState(new Set()); // 跟踪新上传的图片keys
 
   useEffect(() => {
     return () => {
@@ -35,38 +34,63 @@ export function AddLogModal({ plants, getUrlForKey, onClose, onCreate }) {
     );
   }
 
-  async function handlePick(e) {
-    const files = Array.from(e.target.files || []);
-    if (files.length === 0) return;
-
-    const validFiles = files.filter((file) => file.size <= MAX_IMAGE_BYTES);
-    if (validFiles.length !== files.length) {
-      alert(`部分图片太大（>${Math.floor(MAX_IMAGE_BYTES / 1024 / 1024)}MB），已跳过。`);
+  function handleImageSelect(keys) {
+    console.log("[AddLogModal] handleImageSelect called with:", keys);
+    // 确保 keys 是数组
+    const keysArray = Array.isArray(keys) ? keys : [keys].filter(Boolean);
+    console.log("[AddLogModal] keysArray:", keysArray);
+    if (keysArray.length > 0) {
+      // 避免重复添加相同的 key
+      setPhotoKeys((prev) => {
+        console.log("[AddLogModal] Current photoKeys:", prev);
+        const newKeys = keysArray.filter((k) => !prev.includes(k));
+        console.log("[AddLogModal] New keys to add:", newKeys);
+        if (newKeys.length > 0) {
+          const updated = [...prev, ...newKeys];
+          console.log("[AddLogModal] Updated photoKeys:", updated);
+          return updated;
+        }
+        return prev;
+      });
+      // 检查哪些图片是新上传的（不在相册中）
+      const albumKeys = new Set((album || []).map((p) => p.imageKey));
+      setUploadedKeys((prev) => {
+        const next = new Set(prev);
+        keysArray.forEach((k) => {
+          // 只有不在相册中的图片才标记为新上传的
+          if (!albumKeys.has(k)) {
+            next.add(k);
+          }
+        });
+        return next;
+      });
+    } else {
+      console.warn("[AddLogModal] No keys to add");
     }
+  }
 
-    setLoading(true);
-    try {
-      const newKeys = [];
-      const newUrls = { ...previewUrls };
-
-      for (const file of validFiles) {
-        const key = await saveImageToIdb(file);
-        newKeys.push(key);
-        newUrls[key] = URL.createObjectURL(file);
-      }
-
-      setPhotoKeys((prev) => [...prev, ...newKeys]);
-      setPreviewUrls(newUrls);
-    } catch (err) {
-      alert(String(err.message || err));
-    } finally {
-      setLoading(false);
-      e.target.value = "";
+  function handleOpenAlbum(callback) {
+    console.log("[AddLogModal] handleOpenAlbum called, callback:", callback);
+    // callback 是 ImagePicker 传递的回调函数
+    // 当用户选择照片后，callback 会被调用，然后通过 onSelect 传递 keys
+    if (onOpenAlbum) {
+      console.log("[AddLogModal] Calling onOpenAlbum with callback");
+      onOpenAlbum(callback);
+    } else {
+      console.warn("[AddLogModal] onOpenAlbum is not provided");
     }
   }
 
   async function removePhoto(key) {
-    await deleteImageFromIdb(key);
+    // 只有新上传的图片才删除，从相册引用的不删除
+    if (uploadedKeys.has(key)) {
+      await deleteImageFromIdb(key);
+      setUploadedKeys((prev) => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
+    }
     setPhotoKeys((prev) => prev.filter((k) => k !== key));
     if (previewUrls[key]) {
       URL.revokeObjectURL(previewUrls[key]);
@@ -209,8 +233,13 @@ export function AddLogModal({ plants, getUrlForKey, onClose, onCreate }) {
 
         <div>
           <div className="mb-1 text-xs text-zinc-500">照片（可选，可多选）</div>
-          <input type="file" accept="image/*" multiple onChange={handlePick} />
-          {loading && <div className="mt-2 text-sm text-zinc-500">保存中…</div>}
+          <ImagePicker
+            onSelect={handleImageSelect}
+            multiple={true}
+            album={album || []}
+            getUrlForKey={getUrlForKey}
+            onOpenAlbum={handleOpenAlbum}
+          />
           {photoKeys.length > 0 && (
             <div className="mt-2 grid grid-cols-3 gap-2">
               {photoKeys.map((key) => (
