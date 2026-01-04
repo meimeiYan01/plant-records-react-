@@ -5,5 +5,8 @@ export { SettingsTab } from "./SettingsTab";
 export { PlantDetailTab } from "./PlantDetailTab";
 export { PlantsTab } from "./PlantsTab";
 export { KnowledgeTab } from "./KnowledgeTab";
+export { KnowledgeAtlasTab } from "./KnowledgeAtlasTab";
+export { PlantVarietyTab } from "./PlantVarietyTab";
+export { PlantVarietyDetailTab } from "./PlantVarietyDetailTab";
 export { AlbumTab } from "./AlbumTab";
 

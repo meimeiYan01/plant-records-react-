@@ -12,12 +12,19 @@ import {
   EditExpenseModal,
   AddKnowledgeModal,
   EditKnowledgeModal,
+  AddWebsiteModal,
+  EditWebsiteModal,
+  AddPlantVarietyModal,
+  EditPlantVarietyModal,
+  AddVarietyKnowledgeModal,
+  EditVarietyKnowledgeModal,
+  SelectVarietyModal,
   DataPanelModal,
   LocationManagerModal,
   CameraModal,
   AlbumModal,
 } from "./components/modals";
-import { LogsTab, ExpensesTab, HomeTab, SettingsTab, PlantDetailTab, PlantsTab, KnowledgeTab, AlbumTab } from "./components/tabs";
+import { LogsTab, ExpensesTab, HomeTab, SettingsTab, PlantDetailTab, PlantsTab, KnowledgeTab, KnowledgeAtlasTab, PlantVarietyTab, PlantVarietyDetailTab, AlbumTab } from "./components/tabs";
 import { loadState, saveState, daysSince, formatDateTime, LS_KEY, EVENT_TYPES, extFromMime, uid } from "./utils";
 import { exportBackupZip, importBackupZip } from "./services/backupService";
 import { collectLogImageKeys } from "./services/logService";
@@ -33,17 +40,99 @@ import { collectKnowledgeImageKeys } from "./services/knowledgeService";
  */
 
 export default function App() {
+  // 将知识类型为"variety"的数据转换为多肉品种数据
+  const convertKnowledgeToVariety = (knowledge) => {
+    // 兼容旧数据：将旧类型映射到新类型
+    const getNormalizedType = (type) => {
+      if (!type) return "variety";
+      if (type === "markdown" || type === "document") return "variety";
+      if (type === "article" || type === "video" || type === "xiaohongshu" || type === "web") return "care";
+      return type;
+    };
+    
+    const normalizedType = getNormalizedType(knowledge.type);
+    if (normalizedType !== "variety") return null;
+
+    // 兼容旧数据：coverPhotoKey（单个）转为 coverPhotoKeys（数组）
+    const getCoverPhotoKeys = (coverPhotoKey, coverPhotoKeys) => {
+      if (coverPhotoKeys && Array.isArray(coverPhotoKeys)) {
+        return coverPhotoKeys;
+      }
+      if (coverPhotoKey) {
+        return [coverPhotoKey];
+      }
+      return [];
+    };
+
+    // 尝试从内容中提取科属信息（如果存在）
+    const content = knowledge.content || "";
+    let family = "";
+    let genus = "";
+    let species = "";
+    let scientificName = "";
+
+    // 尝试从标题或内容中提取学名（通常用斜体或括号标注）
+    const scientificNameMatch = content.match(/([A-Z][a-z]+(?:\s+[a-z]+)+)/) || 
+                                knowledge.title?.match(/([A-Z][a-z]+(?:\s+[a-z]+)+)/);
+    if (scientificNameMatch) {
+      scientificName = scientificNameMatch[1];
+    }
+
+    return {
+      id: knowledge.id,
+      name: knowledge.title || "未命名品种",
+      scientificName: scientificName,
+      family: family,
+      genus: genus,
+      species: species,
+      description: content,
+      coverPhotoKeys: getCoverPhotoKeys(knowledge.coverPhotoKey, knowledge.coverPhotoKeys),
+      createdAt: knowledge.createdAt || new Date().toISOString(),
+      updatedAt: knowledge.updatedAt || knowledge.createdAt || new Date().toISOString(),
+      _fromKnowledge: true, // 标记来源，用于后续处理
+    };
+  };
+
   const [state, setState] = useState(() => {
     const loaded = loadState();
     if (loaded) {
       // 兼容旧数据：如果没有新字段，初始化为空数组
+      const knowledges = loaded.knowledges || [];
+      const existingVarieties = loaded.plantVarieties || [];
+      
+      // 将知识类型为"variety"的数据转换为多肉品种
+      const convertedVarieties = knowledges
+        .map(convertKnowledgeToVariety)
+        .filter(Boolean); // 过滤掉null值
+      
+      // 合并现有的多肉品种和转换来的品种，去重（基于ID）
+      const allVarietiesMap = new Map();
+      [...existingVarieties, ...convertedVarieties].forEach((v) => {
+        if (!allVarietiesMap.has(v.id)) {
+          allVarietiesMap.set(v.id, v);
+        }
+      });
+      const mergedVarieties = Array.from(allVarietiesMap.values());
+
       return {
         plants: loaded.plants || [],
         events: loaded.events || [],
         locations: loaded.locations || ["南窗", "东窗", "北窗", "补光灯架"],
         generalLogs: loaded.generalLogs || [],
         expenses: loaded.expenses || [],
-        knowledges: loaded.knowledges || [],
+        knowledges: knowledges.filter((k) => {
+          // 过滤掉类型为"variety"的知识，因为它们已经转换为多肉品种
+          const getNormalizedType = (type) => {
+            if (!type) return "variety";
+            if (type === "markdown" || type === "document") return "variety";
+            if (type === "article" || type === "video" || type === "xiaohongshu" || type === "web") return "care";
+            return type;
+          };
+          return getNormalizedType(k.type) !== "variety";
+        }),
+        knowledgeAtlasWebsites: loaded.knowledgeAtlasWebsites || [],
+        plantVarieties: mergedVarieties,
+        varietyKnowledges: loaded.varietyKnowledges || {},
         cameraAlbum: loaded.cameraAlbum || [],
       };
     }
@@ -54,6 +143,9 @@ export default function App() {
       generalLogs: [],
       expenses: [],
       knowledges: [],
+      knowledgeAtlasWebsites: [],
+      plantVarieties: [],
+      varietyKnowledges: {}, // 每个品种的知识：{ varietyId: [knowledge1, ...] }
       cameraAlbum: [],
     };
   });
@@ -72,6 +164,17 @@ export default function App() {
   const [showEditExpense, setShowEditExpense] = useState(null); // expense id
   const [showAddKnowledge, setShowAddKnowledge] = useState(false);
   const [showEditKnowledge, setShowEditKnowledge] = useState(null); // knowledge id
+  const [showKnowledgeAtlas, setShowKnowledgeAtlas] = useState(false);
+  const [showPlantVariety, setShowPlantVariety] = useState(false);
+  const [showPlantVarietyDetail, setShowPlantVarietyDetail] = useState(false);
+  const [selectedVarietyId, setSelectedVarietyId] = useState(null);
+  const [showAddWebsite, setShowAddWebsite] = useState(false);
+  const [showEditWebsite, setShowEditWebsite] = useState(null); // website id
+  const [showAddPlantVariety, setShowAddPlantVariety] = useState(false);
+  const [showEditPlantVariety, setShowEditPlantVariety] = useState(null); // variety id
+  const [showSelectVariety, setShowSelectVariety] = useState(false);
+  const [showAddVarietyKnowledge, setShowAddVarietyKnowledge] = useState(false);
+  const [showEditVarietyKnowledge, setShowEditVarietyKnowledge] = useState(null); // variety knowledge id
   const [showDataPanel, setShowDataPanel] = useState(false);
   const [showLocationManager, setShowLocationManager] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
@@ -483,6 +586,145 @@ export default function App() {
     }));
   }
 
+  // 知识图鉴网站管理函数
+  function addWebsite(website) {
+    setState((s) => ({ ...s, knowledgeAtlasWebsites: [website, ...(s.knowledgeAtlasWebsites || [])] }));
+  }
+
+  function updateWebsite(updatedWebsite) {
+    setState((s) => ({
+      ...s,
+      knowledgeAtlasWebsites: (s.knowledgeAtlasWebsites || []).map((w) => (w.id === updatedWebsite.id ? updatedWebsite : w)),
+    }));
+  }
+
+  function deleteWebsite(websiteId) {
+    setState((s) => ({
+      ...s,
+      knowledgeAtlasWebsites: (s.knowledgeAtlasWebsites || []).filter((w) => w.id !== websiteId),
+    }));
+  }
+
+  // 多肉品种管理函数
+  function addPlantVariety(variety) {
+    setState((s) => ({ ...s, plantVarieties: [variety, ...(s.plantVarieties || [])] }));
+  }
+
+  function updatePlantVariety(updatedVariety) {
+    setState((s) => {
+      const originalVariety = s.plantVarieties?.find((v) => v.id === updatedVariety.id);
+      const isFromKnowledge = originalVariety?._fromKnowledge;
+
+      // 如果这个品种来自知识模块，也要同步更新知识模块
+      let newKnowledges = s.knowledges;
+      if (isFromKnowledge) {
+        // 将更新后的品种数据转换回知识格式
+        const updatedKnowledge = {
+          id: updatedVariety.id,
+          type: "variety",
+          title: updatedVariety.name,
+          content: updatedVariety.description,
+          url: "",
+          tags: [],
+          coverPhotoKeys: updatedVariety.coverPhotoKeys || [],
+          source: "",
+          createdAt: updatedVariety.createdAt,
+          updatedAt: updatedVariety.updatedAt || new Date().toISOString(),
+        };
+        newKnowledges = (s.knowledges || []).map((k) => 
+          k.id === updatedVariety.id ? updatedKnowledge : k
+        );
+      }
+
+      return {
+        ...s,
+        plantVarieties: (s.plantVarieties || []).map((v) => (v.id === updatedVariety.id ? updatedVariety : v)),
+        knowledges: newKnowledges,
+      };
+    });
+  }
+
+  function deletePlantVariety(varietyId) {
+    const variety = state.plantVarieties?.find((v) => v.id === varietyId);
+    if (!variety) return;
+
+    // 删除关联的封面图
+    const photoKeys = variety.coverPhotoKeys && Array.isArray(variety.coverPhotoKeys)
+      ? variety.coverPhotoKeys
+      : (variety.coverPhotoKey ? [variety.coverPhotoKey] : []);
+    
+    photoKeys.forEach((key) => {
+      if (key) removeImageKey(key).catch(() => {});
+    });
+
+    setState((s) => {
+      // 如果这个品种来自知识模块，也要从知识模块中删除
+      const newKnowledges = variety._fromKnowledge
+        ? (s.knowledges || []).filter((k) => k.id !== varietyId)
+        : s.knowledges;
+
+      return {
+        ...s,
+        plantVarieties: (s.plantVarieties || []).filter((v) => v.id !== varietyId),
+        knowledges: newKnowledges,
+      };
+    });
+  }
+
+  // 品种知识管理函数
+  function addVarietyKnowledge(varietyId, knowledge) {
+    setState((s) => {
+      const currentKnowledges = s.varietyKnowledges?.[varietyId] || [];
+      return {
+        ...s,
+        varietyKnowledges: {
+          ...(s.varietyKnowledges || {}),
+          [varietyId]: [knowledge, ...currentKnowledges],
+        },
+      };
+    });
+  }
+
+  function updateVarietyKnowledge(varietyId, updatedKnowledge) {
+    setState((s) => {
+      const currentKnowledges = s.varietyKnowledges?.[varietyId] || [];
+      return {
+        ...s,
+        varietyKnowledges: {
+          ...(s.varietyKnowledges || {}),
+          [varietyId]: currentKnowledges.map((k) => 
+            k.id === updatedKnowledge.id ? updatedKnowledge : k
+          ),
+        },
+      };
+    });
+  }
+
+  function deleteVarietyKnowledge(varietyId, knowledgeId) {
+    const knowledge = state.varietyKnowledges?.[varietyId]?.find((k) => k.id === knowledgeId);
+    if (!knowledge) return;
+
+    // 删除关联的封面图
+    const photoKeys = knowledge.coverPhotoKeys && Array.isArray(knowledge.coverPhotoKeys)
+      ? knowledge.coverPhotoKeys
+      : (knowledge.coverPhotoKey ? [knowledge.coverPhotoKey] : []);
+    
+    photoKeys.forEach((key) => {
+      if (key) removeImageKey(key).catch(() => {});
+    });
+
+    setState((s) => {
+      const currentKnowledges = s.varietyKnowledges?.[varietyId] || [];
+      return {
+        ...s,
+        varietyKnowledges: {
+          ...(s.varietyKnowledges || {}),
+          [varietyId]: currentKnowledges.filter((k) => k.id !== knowledgeId),
+        },
+      };
+    });
+  }
+
   function resetAll() {
     localStorage.removeItem(LS_KEY);
     window.location.reload();
@@ -527,28 +769,30 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900">
-      <header className="sticky top-0 z-10 border-b border-zinc-200 dark:border-zinc-700 bg-white/80 dark:bg-zinc-800/80 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900">
-              🌱
+      {currentTab === "home" && (
+        <header className="sticky top-0 z-10 border-b border-zinc-200 dark:border-zinc-700 bg-white/80 dark:bg-zinc-800/80 backdrop-blur">
+          <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900">
+                🌱
+              </div>
+              <div>
+                <div className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">多肉记录</div>
+                <div className="text-xs text-zinc-500 dark:text-zinc-400">记录你的多肉养殖全流程</div>
+              </div>
             </div>
-            <div>
-              <div className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">多肉记录</div>
-              <div className="text-xs text-zinc-500 dark:text-zinc-400">记录你的多肉养殖全流程</div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={toggleTheme}
+                className="flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition"
+                aria-label={isDark ? "切换到白天模式" : "切换到夜间模式"}
+              >
+                {isDark ? "☀️" : "🌙"}
+              </button>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={toggleTheme}
-              className="flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition"
-              aria-label={isDark ? "切换到白天模式" : "切换到夜间模式"}
-            >
-              {isDark ? "☀️" : "🌙"}
-            </button>
-          </div>
-        </div>
-      </header>
+        </header>
+      )}
 
       <main className="mx-auto max-w-6xl p-4 pb-24 md:pb-4">
         {/* 标签页内容 */}
@@ -667,7 +911,7 @@ export default function App() {
           />
         )}
 
-        {currentTab === "knowledge" && (
+        {currentTab === "knowledge" && !showKnowledgeAtlas && !showPlantVariety && (
           <KnowledgeTab
             knowledges={state.knowledges || []}
             getUrlForKey={getUrlForKey}
@@ -681,6 +925,71 @@ export default function App() {
               })
             }
             openImageViewer={openImageViewer}
+            onOpenAtlas={() => setShowKnowledgeAtlas(true)}
+            onOpenVariety={() => setShowPlantVariety(true)}
+          />
+        )}
+
+        {currentTab === "knowledge" && showKnowledgeAtlas && (
+          <KnowledgeAtlasTab
+            websites={state.knowledgeAtlasWebsites || []}
+            onAdd={() => setShowAddWebsite(true)}
+            onEdit={(id) => setShowEditWebsite(id)}
+            onDelete={(id) =>
+              setDeleteConfirm({
+                type: "website",
+                id,
+                name: state.knowledgeAtlasWebsites?.find((w) => w.id === id)?.name || "网站",
+              })
+            }
+            onBack={() => setShowKnowledgeAtlas(false)}
+          />
+        )}
+
+        {currentTab === "knowledge" && showPlantVariety && !showPlantVarietyDetail && (
+          <PlantVarietyTab
+            varieties={state.plantVarieties || []}
+            getUrlForKey={getUrlForKey}
+            onAddKnowledge={() => setShowSelectVariety(true)}
+            onEdit={(id) => setShowEditPlantVariety(id)}
+            onDelete={(id) =>
+              setDeleteConfirm({
+                type: "variety",
+                id,
+                name: state.plantVarieties?.find((v) => v.id === id)?.name || "品种",
+              })
+            }
+            openImageViewer={openImageViewer}
+            onBack={() => setShowPlantVariety(false)}
+            onVarietyClick={(id) => {
+              setSelectedVarietyId(id);
+              setShowPlantVarietyDetail(true);
+            }}
+          />
+        )}
+
+        {currentTab === "knowledge" && showPlantVariety && showPlantVarietyDetail && selectedVarietyId && (
+          <PlantVarietyDetailTab
+            variety={state.plantVarieties?.find((v) => v.id === selectedVarietyId)}
+            knowledges={state.varietyKnowledges?.[selectedVarietyId] || []}
+            getUrlForKey={getUrlForKey}
+            onAdd={() => {
+              setShowAddVarietyKnowledge(true);
+            }}
+            onEdit={(id) => setShowEditVarietyKnowledge(id)}
+            onDelete={(id) =>
+              setDeleteConfirm({
+                type: "varietyKnowledge",
+                id,
+                varietyId: selectedVarietyId,
+                name: state.varietyKnowledges?.[selectedVarietyId]?.find((k) => k.id === id)?.title || "知识",
+              })
+            }
+            openImageViewer={openImageViewer}
+            onBack={() => {
+              setShowPlantVarietyDetail(false);
+              setSelectedVarietyId(null);
+            }}
           />
         )}
 
@@ -879,6 +1188,93 @@ export default function App() {
         />
       )}
 
+      {showAddWebsite && (
+        <AddWebsiteModal
+          onClose={() => setShowAddWebsite(false)}
+          onCreate={(website) => {
+            addWebsite(website);
+            setShowAddWebsite(false);
+          }}
+        />
+      )}
+
+      {showEditWebsite && (
+        <EditWebsiteModal
+          website={state.knowledgeAtlasWebsites?.find((w) => w.id === showEditWebsite)}
+          onClose={() => setShowEditWebsite(null)}
+          onUpdate={(updated) => {
+            updateWebsite(updated);
+            setShowEditWebsite(null);
+          }}
+        />
+      )}
+
+      {showAddPlantVariety && (
+        <AddPlantVarietyModal
+          getUrlForKey={getUrlForKey}
+          onClose={() => setShowAddPlantVariety(false)}
+          onCreate={(variety) => {
+            addPlantVariety(variety);
+            setShowAddPlantVariety(false);
+          }}
+        />
+      )}
+
+      {showEditPlantVariety && (
+        <EditPlantVarietyModal
+          variety={state.plantVarieties?.find((v) => v.id === showEditPlantVariety)}
+          getUrlForKey={getUrlForKey}
+          onClose={() => setShowEditPlantVariety(null)}
+          onUpdate={(updated) => {
+            updatePlantVariety(updated);
+            setShowEditPlantVariety(null);
+          }}
+        />
+      )}
+
+      {showSelectVariety && (
+        <SelectVarietyModal
+          varieties={state.plantVarieties || []}
+          getUrlForKey={getUrlForKey}
+          onClose={() => setShowSelectVariety(false)}
+          onSelect={(varietyId) => {
+            setSelectedVarietyId(varietyId);
+            setShowSelectVariety(false);
+            setShowAddVarietyKnowledge(true);
+          }}
+        />
+      )}
+
+      {showAddVarietyKnowledge && selectedVarietyId && (
+        <AddVarietyKnowledgeModal
+          varietyId={selectedVarietyId}
+          varietyName={state.plantVarieties?.find((v) => v.id === selectedVarietyId)?.name || "品种"}
+          getUrlForKey={getUrlForKey}
+          onClose={() => {
+            setShowAddVarietyKnowledge(false);
+            // 不清空selectedVarietyId，保持在品种详情tab
+          }}
+          onCreate={(knowledge) => {
+            addVarietyKnowledge(selectedVarietyId, knowledge);
+            setShowAddVarietyKnowledge(false);
+            // 不清空selectedVarietyId，保持在品种详情tab
+          }}
+        />
+      )}
+
+      {showEditVarietyKnowledge && selectedVarietyId && (
+        <EditVarietyKnowledgeModal
+          knowledge={state.varietyKnowledges?.[selectedVarietyId]?.find((k) => k.id === showEditVarietyKnowledge)}
+          varietyName={state.plantVarieties?.find((v) => v.id === selectedVarietyId)?.name || "品种"}
+          getUrlForKey={getUrlForKey}
+          onClose={() => setShowEditVarietyKnowledge(null)}
+          onUpdate={(updated) => {
+            updateVarietyKnowledge(selectedVarietyId, updated);
+            setShowEditVarietyKnowledge(null);
+          }}
+        />
+      )}
+
       {deleteConfirm && (
         <ConfirmDialog
           title="确认删除"
@@ -892,6 +1288,12 @@ export default function App() {
               : deleteConfirm.type === "expense"
               ? `确定要删除花费记录"${deleteConfirm.name}"吗？此操作不可恢复。`
               : deleteConfirm.type === "knowledge"
+              ? `确定要删除知识"${deleteConfirm.name}"吗？此操作不可恢复。`
+              : deleteConfirm.type === "website"
+              ? `确定要删除网站"${deleteConfirm.name}"吗？此操作不可恢复。`
+              : deleteConfirm.type === "variety"
+              ? `确定要删除品种"${deleteConfirm.name}"吗？此操作不可恢复。`
+              : deleteConfirm.type === "varietyKnowledge"
               ? `确定要删除知识"${deleteConfirm.name}"吗？此操作不可恢复。`
               : `确定要删除吗？此操作不可恢复。`
           }
@@ -908,6 +1310,12 @@ export default function App() {
               deleteExpense(deleteConfirm.id);
             } else if (deleteConfirm.type === "knowledge") {
               deleteKnowledge(deleteConfirm.id);
+            } else if (deleteConfirm.type === "website") {
+              deleteWebsite(deleteConfirm.id);
+            } else if (deleteConfirm.type === "variety") {
+              deletePlantVariety(deleteConfirm.id);
+            } else if (deleteConfirm.type === "varietyKnowledge") {
+              deleteVarietyKnowledge(deleteConfirm.varietyId, deleteConfirm.id);
             }
             setDeleteConfirm(null);
           }}

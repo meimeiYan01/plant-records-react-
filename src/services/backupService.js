@@ -48,6 +48,32 @@ export function collectReferencedImageKeys(state) {
     if (photo.imageKey) keys.add(photo.imageKey);
   }
   
+  // 品种图片
+  if (state.plantVarieties) {
+    state.plantVarieties.forEach((variety) => {
+      const photoKeys = variety.coverPhotoKeys && Array.isArray(variety.coverPhotoKeys)
+        ? variety.coverPhotoKeys
+        : (variety.coverPhotoKey ? [variety.coverPhotoKey] : []);
+      photoKeys.forEach((key) => {
+        if (key) keys.add(key);
+      });
+    });
+  }
+  
+  // 品种知识图片
+  if (state.varietyKnowledges) {
+    Object.values(state.varietyKnowledges).forEach((knowledges) => {
+      knowledges.forEach((knowledge) => {
+        const photoKeys = knowledge.coverPhotoKeys && Array.isArray(knowledge.coverPhotoKeys)
+          ? knowledge.coverPhotoKeys
+          : (knowledge.coverPhotoKey ? [knowledge.coverPhotoKey] : []);
+        photoKeys.forEach((key) => {
+          if (key) keys.add(key);
+        });
+      });
+    });
+  }
+  
   return Array.from(keys);
 }
 
@@ -171,6 +197,9 @@ export async function importBackupZip(file) {
         tags: k.tags || [],
       };
     }),
+    knowledgeAtlasWebsites: state.knowledgeAtlasWebsites || [],
+    plantVarieties: state.plantVarieties || [],
+    varietyKnowledges: state.varietyKnowledges || {},
     cameraAlbum: state.cameraAlbum || [],
   };
 

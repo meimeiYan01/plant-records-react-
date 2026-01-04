@@ -6,7 +6,7 @@ import { saveImageToIdb, deleteImageFromIdb, MAX_IMAGE_BYTES, KNOWLEDGE_TYPES, K
 import { createKnowledge } from "../../services/knowledgeService";
 
 export function AddKnowledgeModal({ getUrlForKey, onClose, onCreate }) {
-  const [type, setType] = useState("document");
+  const [type, setType] = useState("care");
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [url, setUrl] = useState("");
@@ -73,10 +73,7 @@ export function AddKnowledgeModal({ getUrlForKey, onClose, onCreate }) {
   }
 
   function handleCreate() {
-    if (type === "web" && !url.trim()) {
-      alert("请输入URL");
-      return;
-    }
+    // URL现在是可选的，不再强制要求
 
     // 处理来源：如果是自定义，使用自定义输入的值
     const finalSource = source === "custom" ? customSource.trim() : (source ? KNOWLEDGE_SOURCES.find(s => s.key === source)?.label || source : "");
@@ -95,8 +92,6 @@ export function AddKnowledgeModal({ getUrlForKey, onClose, onCreate }) {
   }
 
   const knowledgeType = KNOWLEDGE_TYPES.find((t) => t.key === type);
-  const isDocument = type === "document";
-  const isWeb = type === "web";
 
   return (
     <Modal title="新建知识" onClose={onClose}>
@@ -108,7 +103,7 @@ export function AddKnowledgeModal({ getUrlForKey, onClose, onCreate }) {
             value={type}
             onChange={(e) => setType(e.target.value)}
           >
-            {KNOWLEDGE_TYPES.map((t) => (
+            {KNOWLEDGE_TYPES.filter(t => t.key !== "variety").map((t) => (
               <option key={t.key} value={t.key}>
                 {t.icon} {t.label}
               </option>
@@ -126,41 +121,26 @@ export function AddKnowledgeModal({ getUrlForKey, onClose, onCreate }) {
           />
         </div>
 
-        {isDocument ? (
-          <div>
-            <div className="mb-1 text-xs text-zinc-500 dark:text-zinc-400">Markdown内容</div>
-            <textarea
-              className="w-full rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 outline-none focus:border-zinc-900 dark:focus:border-zinc-600"
-              rows={8}
-              placeholder="输入Markdown格式的内容..."
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-            />
-          </div>
-        ) : (
-          <>
-            <div>
-              <div className="mb-1 text-xs text-zinc-500 dark:text-zinc-400">URL *</div>
-              <input
-                className="w-full rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 outline-none focus:border-zinc-900 dark:focus:border-zinc-600"
-                type="url"
-                placeholder="https://..."
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-              />
-            </div>
-            <div>
-              <div className="mb-1 text-xs text-zinc-500 dark:text-zinc-400">描述/备注</div>
-              <textarea
-                className="w-full rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 outline-none focus:border-zinc-900 dark:focus:border-zinc-600"
-                rows={4}
-                placeholder="记录一些关键信息或备注..."
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-              />
-            </div>
-          </>
-        )}
+        <div>
+          <div className="mb-1 text-xs text-zinc-500 dark:text-zinc-400">URL（可选）</div>
+          <input
+            className="w-full rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 outline-none focus:border-zinc-900 dark:focus:border-zinc-600"
+            type="url"
+            placeholder="https://..."
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+          />
+        </div>
+        <div>
+          <div className="mb-1 text-xs text-zinc-500 dark:text-zinc-400">Markdown内容（可选）</div>
+          <textarea
+            className="w-full rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 outline-none focus:border-zinc-900 dark:focus:border-zinc-600"
+            rows={8}
+            placeholder="输入Markdown格式的内容..."
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+          />
+        </div>
 
         <div>
           <div className="mb-1 text-xs text-zinc-500 dark:text-zinc-400">来源（可选）</div>

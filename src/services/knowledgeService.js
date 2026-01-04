@@ -10,9 +10,11 @@ export function createKnowledge(knowledge) {
   const now = new Date().toISOString();
   // 兼容旧数据：将旧类型映射到新类型
   const getNormalizedType = (type) => {
-    if (!type) return "document";
-    if (type === "markdown") return "document";
-    if (type === "article" || type === "video" || type === "xiaohongshu") return "web";
+    if (!type) return "variety";
+    // 旧类型映射：document/markdown -> variety, web/article/video/xiaohongshu -> care
+    if (type === "markdown" || type === "document") return "variety";
+    if (type === "article" || type === "video" || type === "xiaohongshu" || type === "web") return "care";
+    // 新类型直接返回
     return type;
   };
   
@@ -45,11 +47,7 @@ export function createKnowledge(knowledge) {
  * 验证知识数据
  */
 export function validateKnowledge(knowledge) {
-  // 标题现在是可选的，不再验证
-  // 如果是网络资源类型，URL是必需的
-  if (knowledge.type === "web" && (!knowledge.url || knowledge.url.trim() === "")) {
-    return false;
-  }
+  // 标题、URL、内容现在都是可选的，不再强制验证
   return true;
 }
 

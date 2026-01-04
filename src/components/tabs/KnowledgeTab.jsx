@@ -5,9 +5,12 @@ import { ImageViewer } from "../ui/ImageViewer";
 import { AdvancedFilter } from "../ui/AdvancedFilter";
 import { MarkdownRenderer } from "../ui/MarkdownRenderer";
 
-export function KnowledgeTab({ knowledges, getUrlForKey, onAdd, onEdit, onDelete, openImageViewer }) {
-  const [filterType, setFilterType] = useState("all");
+export function KnowledgeTab({ knowledges, getUrlForKey, onAdd, onEdit, onDelete, openImageViewer, onOpenAtlas, onOpenVariety }) {
+  // 默认选择第一个非variety的类型（因为variety已经迁移到多肉品种Tab）
+  const defaultType = KNOWLEDGE_TYPES.find(t => t.key !== "variety")?.key || KNOWLEDGE_TYPES[0]?.key || "care";
+  const [filterType, setFilterType] = useState(defaultType);
   const [searchText, setSearchText] = useState("");
+  const [showSearch, setShowSearch] = useState(false);
   const [showAdvancedFilter, setShowAdvancedFilter] = useState(false);
   const [advancedFilters, setAdvancedFilters] = useState({});
 
@@ -25,10 +28,20 @@ export function KnowledgeTab({ knowledges, getUrlForKey, onAdd, onEdit, onDelete
   const filteredKnowledges = useMemo(() => {
     let result = [...knowledges];
 
-    // 基础类型筛选
-    if (filterType !== "all") {
-      result = result.filter((knowledge) => knowledge.type === filterType);
-    }
+    // 基础类型筛选（注意：variety类型已经被迁移到多肉品种Tab，这里不再显示）
+    result = result.filter((knowledge) => {
+      // 兼容旧数据：将旧类型映射到新类型
+      const getNormalizedType = (type) => {
+        if (!type) return "variety";
+        if (type === "markdown" || type === "document") return "variety";
+        if (type === "article" || type === "video" || type === "xiaohongshu" || type === "web") return "care";
+        return type;
+      };
+      const normalizedType = getNormalizedType(knowledge.type);
+      // 过滤掉variety类型，因为它们已经迁移到多肉品种Tab
+      if (normalizedType === "variety") return false;
+      return normalizedType === filterType;
+    });
 
     // 文本搜索
     if (searchText.trim()) {
@@ -99,17 +112,7 @@ export function KnowledgeTab({ knowledges, getUrlForKey, onAdd, onEdit, onDelete
       <div className="space-y-2">
         <div className="flex items-center gap-2">
           <div className="flex flex-1 gap-2 overflow-x-auto">
-            <button
-              onClick={() => setFilterType("all")}
-              className={`shrink-0 rounded-full border px-3 py-1 text-xs transition ${
-                filterType === "all"
-                  ? "border-zinc-900 dark:border-zinc-600 bg-zinc-900 dark:bg-zinc-700 text-white dark:text-zinc-100"
-                  : "border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700"
-              }`}
-            >
-              全部
-            </button>
-            {KNOWLEDGE_TYPES.map((t) => (
+            {KNOWLEDGE_TYPES.filter(t => t.key !== "variety").map((t) => (
               <button
                 key={t.key}
                 onClick={() => setFilterType(t.key)}
@@ -122,29 +125,61 @@ export function KnowledgeTab({ knowledges, getUrlForKey, onAdd, onEdit, onDelete
                 {t.icon} {t.label}
               </button>
             ))}
+            {/* 多肉品种按钮 */}
+            <button
+              onClick={onOpenVariety}
+              className="shrink-0 rounded-full border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700 px-3 py-1 text-xs transition"
+            >
+              🌱 多肉品种
+            </button>
+            {/* 知识图鉴按钮 */}
+            <button
+              onClick={onOpenAtlas}
+              className="shrink-0 rounded-full border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700 px-3 py-1 text-xs transition"
+            >
+              📖 知识图鉴
+            </button>
           </div>
           <button
-            onClick={() => setShowAdvancedFilter(true)}
+            onClick={() => {
+              setShowSearch(!showSearch);
+              if (!showSearch) {
+                setShowAdvancedFilter(false);
+              }
+            }}
             className={`shrink-0 rounded-lg border px-3 py-1 text-xs transition ${
-              hasActiveFilters
+              showSearch || searchText.trim() || hasActiveFilters
                 ? "border-zinc-900 dark:border-zinc-600 bg-zinc-900 dark:bg-zinc-700 text-white dark:text-zinc-100"
                 : "border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700"
             }`}
-            title="高级筛选"
+            title="搜索"
           >
             🔍
           </button>
         </div>
 
-        <div className="flex gap-2">
-          <input
-            type="text"
-            placeholder="搜索知识..."
-            className="flex-1 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 px-3 py-2 text-sm outline-none focus:border-zinc-900 dark:focus:border-zinc-600"
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-          />
-        </div>
+        {/* 搜索框 - 点击🔍按钮时显示 */}
+        {showSearch && (
+          <div className="flex gap-2">
+            <input
+              type="text"
+              placeholder="搜索知识..."
+              className="flex-1 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 px-3 py-2 text-sm outline-none focus:border-zinc-900 dark:focus:border-zinc-600"
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              autoFocus
+            />
+            <button
+              onClick={() => {
+                setSearchText("");
+                setShowSearch(false);
+              }}
+              className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700 px-3 py-2 text-sm transition"
+            >
+              取消
+            </button>
+          </div>
+        )}
 
         {hasActiveFilters && (
           <div className="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400">
@@ -211,20 +246,21 @@ function KnowledgeCard({ knowledge, getUrlForKey, onEdit, onDelete, handleImageC
   
   // 兼容旧数据：将旧类型映射到新类型
   const getNormalizedType = (type) => {
-    if (type === "markdown") return "document";
-    if (type === "article" || type === "video" || type === "xiaohongshu") return "web";
-    return type || "document";
+    // 旧类型映射：document/markdown -> variety, web/article/video/xiaohongshu -> care
+    if (type === "markdown" || type === "document") return "variety";
+    if (type === "article" || type === "video" || type === "xiaohongshu" || type === "web") return "care";
+    // 新类型直接返回
+    return type || "variety";
   };
   
   const normalizedType = getNormalizedType(knowledge.type);
   const knowledgeType = KNOWLEDGE_TYPES.find((t) => t.key === normalizedType);
-  // 如果找不到类型，默认使用第一个（文档）
+  // 如果找不到类型，默认使用第一个（多肉品种）
   const displayType = knowledgeType || KNOWLEDGE_TYPES[0];
-  const isDocument = normalizedType === "document";
-  const isWebType = normalizedType === "web" && knowledge.url;
+  const hasUrl = knowledge.url;
   
-  // 对于非文档类型，内容预览
-  const contentPreview = !isDocument && knowledge.content && knowledge.content.length > 150 
+  // 内容预览
+  const contentPreview = knowledge.content && knowledge.content.length > 150 
     ? knowledge.content.slice(0, 150) + "..." 
     : knowledge.content;
 
@@ -254,8 +290,8 @@ function KnowledgeCard({ knowledge, getUrlForKey, onEdit, onDelete, handleImageC
 
   return (
     <div className="rounded-2xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 shadow-sm transition hover:shadow-md overflow-hidden">
-      {/* 网页类型：封面图在顶部 */}
-      {isWebType && photoKeys.length > 0 && (
+      {/* 有URL的：封面图在顶部 */}
+      {hasUrl && photoKeys.length > 0 && (
         <div className="w-full h-48 overflow-hidden bg-zinc-100 dark:bg-zinc-700">
           {photoKeys.length === 1 ? (
             <div
@@ -297,7 +333,7 @@ function KnowledgeCard({ knowledge, getUrlForKey, onEdit, onDelete, handleImageC
             <div className="flex items-center gap-2 flex-wrap">
               <Badge>{displayType ? `${displayType.icon} ${displayType.label}` : "知识"}</Badge>
               <span className="text-xs text-zinc-500 dark:text-zinc-400">{formatDateTime(knowledge.createdAt)}</span>
-              {photoKeys.length > 0 && !isWebType && (
+              {photoKeys.length > 0 && !hasUrl && (
                 <span className="text-xs text-zinc-400 dark:text-zinc-500">📷 {photoKeys.length > 1 ? photoKeys.length : ""}</span>
               )}
             </div>
@@ -321,7 +357,7 @@ function KnowledgeCard({ knowledge, getUrlForKey, onEdit, onDelete, handleImageC
           <div className="mt-2 text-base font-semibold text-zinc-900 dark:text-zinc-100">{knowledge.title}</div>
             
             {/* Markdown内容渲染 */}
-            {isDocument && knowledge.content && (
+            {knowledge.content && !hasUrl && (
               <div className="mt-2">
                 {expanded ? (
                   <MarkdownRenderer content={knowledge.content} />
@@ -349,8 +385,8 @@ function KnowledgeCard({ knowledge, getUrlForKey, onEdit, onDelete, handleImageC
               </div>
             )}
 
-            {/* 非文档类型的内容 */}
-            {!isDocument && knowledge.content && (
+            {/* 有URL类型的内容 */}
+            {hasUrl && knowledge.content && (
               <div className="mt-2 text-sm text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap">
                 {expanded ? knowledge.content : contentPreview}
                 {knowledge.content.length > 150 && (
@@ -365,7 +401,7 @@ function KnowledgeCard({ knowledge, getUrlForKey, onEdit, onDelete, handleImageC
             )}
 
             {/* 网页链接 - 改进的展示 */}
-            {isWebType && knowledge.url && (
+            {hasUrl && knowledge.url && (
               <div className="mt-3">
                 <a
                   href={knowledge.url}
@@ -398,8 +434,8 @@ function KnowledgeCard({ knowledge, getUrlForKey, onEdit, onDelete, handleImageC
           </div>
         )}
 
-        {/* 文档类型：封面图在底部 */}
-        {isDocument && photoKeys.length > 0 && (
+        {/* 无URL类型：封面图在底部 */}
+        {!hasUrl && photoKeys.length > 0 && (
           <div className="mt-3">
             {photoKeys.length === 1 ? (
               <div

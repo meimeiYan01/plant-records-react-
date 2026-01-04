@@ -2,59 +2,20 @@ import { useEffect, useState } from "react";
 import { Modal } from "../ui/Modal";
 import { Button } from "../ui/Button";
 import { ImageFromIdb } from "../ui/ImageFromIdb";
-import {
-  saveImageToIdb,
-  deleteImageFromIdb,
-  MAX_IMAGE_BYTES,
-  KNOWLEDGE_TYPES,
-  KNOWLEDGE_TAGS,
-  KNOWLEDGE_SOURCES,
-  formatDateTime,
-} from "../../utils";
+import { saveImageToIdb, deleteImageFromIdb, MAX_IMAGE_BYTES, KNOWLEDGE_TAGS, KNOWLEDGE_SOURCES, uid } from "../../utils";
+import { createKnowledge } from "../../services/knowledgeService";
 
-export function EditKnowledgeModal({ knowledge, getUrlForKey, onClose, onUpdate }) {
-  // 兼容旧数据：将旧类型映射到新类型
-  const getType = (oldType) => {
-    // 旧类型映射：document/markdown -> variety, web/article/video/xiaohongshu -> care
-    if (oldType === "markdown" || oldType === "document") return "variety";
-    if (oldType === "article" || oldType === "video" || oldType === "xiaohongshu" || oldType === "web") return "care";
-    // 新类型直接返回
-    return oldType || "variety";
-  };
-
-  // 处理来源：如果是预设值，找到对应的key；否则设为custom并填入customSource
-  const getSourceState = (sourceValue) => {
-    if (!sourceValue) return { source: "", customSource: "" };
-    const found = KNOWLEDGE_SOURCES.find(s => s.label === sourceValue);
-    if (found) {
-      return { source: found.key, customSource: "" };
-    }
-    return { source: "custom", customSource: sourceValue };
-  };
-
-  const [type, setType] = useState(getType(knowledge.type));
-  const [title, setTitle] = useState(knowledge.title || "");
-  const [content, setContent] = useState(knowledge.content || "");
-  const [url, setUrl] = useState(knowledge.url || "");
-  const [tags, setTags] = useState(knowledge.tags || []);
-  const sourceState = getSourceState(knowledge.source || "");
-  const [source, setSource] = useState(sourceState.source);
-  const [customSource, setCustomSource] = useState(sourceState.customSource);
-  // 兼容旧数据：coverPhotoKey（单个）转为 coverPhotoKeys（数组）
-  const getInitialPhotoKeys = () => {
-    if (knowledge.coverPhotoKeys && Array.isArray(knowledge.coverPhotoKeys)) {
-      return knowledge.coverPhotoKeys;
-    }
-    if (knowledge.coverPhotoKey) {
-      return [knowledge.coverPhotoKey];
-    }
-    return [];
-  };
-  
-  const [coverPhotoKeys, setCoverPhotoKeys] = useState(getInitialPhotoKeys());
+export function AddVarietyKnowledgeModal({ varietyId, varietyName, getUrlForKey, onClose, onCreate }) {
+  const [type, setType] = useState("care");
+  const [title, setTitle] = useState("");
+  const [content, setContent] = useState("");
+  const [url, setUrl] = useState("");
+  const [tags, setTags] = useState([]);
+  const [source, setSource] = useState("");
+  const [customSource, setCustomSource] = useState("");
+  const [coverPhotoKeys, setCoverPhotoKeys] = useState([]);
   const [previewUrls, setPreviewUrls] = useState({});
   const [loading, setLoading] = useState(false);
-  const [oldCoverPhotoKeys, setOldCoverPhotoKeys] = useState(getInitialPhotoKeys());
 
   useEffect(() => {
     return () => {
@@ -111,38 +72,29 @@ export function EditKnowledgeModal({ knowledge, getUrlForKey, onClose, onUpdate 
     }
   }
 
-  function handleSave() {
+  function handleCreate() {
     // URL现在是可选的，不再强制要求
 
     // 处理来源：如果是自定义，使用自定义输入的值
     const finalSource = source === "custom" ? customSource.trim() : (source ? KNOWLEDGE_SOURCES.find(s => s.key === source)?.label || source : "");
 
-    // 删除旧封面图（如果被移除）
-    const removedKeys = oldCoverPhotoKeys.filter((k) => !coverPhotoKeys.includes(k));
-    removedKeys.forEach((key) => deleteImageFromIdb(key).catch(() => {}));
-
-    const updated = {
-      ...knowledge,
+    const knowledge = createKnowledge({
+      id: uid("variety_knowledge"),
       type,
-      title: title.trim(),
+      title: title.trim() || `${varietyName} - 知识`,
       content: content.trim(),
       url: url.trim(),
       tags,
       source: finalSource,
       coverPhotoKeys,
-      updatedAt: new Date().toISOString(),
-    };
-    onUpdate(updated);
+      varietyId, // 关联的品种ID
+    });
+    onCreate(knowledge);
   }
 
-
   return (
-    <Modal title="编辑知识" onClose={onClose}>
+    <Modal title={`添加${varietyName}的知识`} onClose={onClose}>
       <div className="space-y-3 max-h-[70vh] overflow-y-auto">
-        <div className="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 p-2 text-xs text-zinc-600 dark:text-zinc-400">
-          创建时间：{formatDateTime(knowledge.createdAt)}
-        </div>
-
         <div>
           <div className="mb-1 text-xs text-zinc-500 dark:text-zinc-400">知识类型</div>
           <select
@@ -150,11 +102,8 @@ export function EditKnowledgeModal({ knowledge, getUrlForKey, onClose, onUpdate 
             value={type}
             onChange={(e) => setType(e.target.value)}
           >
-            {KNOWLEDGE_TYPES.filter(t => t.key !== "variety").map((t) => (
-              <option key={t.key} value={t.key}>
-                {t.icon} {t.label}
-              </option>
-            ))}
+            <option value="care">💧 种植养护</option>
+            <option value="qa">❓ 小问小答</option>
           </select>
         </div>
 
@@ -272,8 +221,8 @@ export function EditKnowledgeModal({ knowledge, getUrlForKey, onClose, onUpdate 
           <Button variant="secondary" onClick={onClose}>
             取消
           </Button>
-          <Button onClick={handleSave}>
-            保存
+          <Button onClick={handleCreate}>
+            创建
           </Button>
         </div>
       </div>

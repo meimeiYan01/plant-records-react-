@@ -6,40 +6,28 @@ import {
   saveImageToIdb,
   deleteImageFromIdb,
   MAX_IMAGE_BYTES,
-  KNOWLEDGE_TYPES,
   KNOWLEDGE_TAGS,
   KNOWLEDGE_SOURCES,
   formatDateTime,
 } from "../../utils";
 
-export function EditKnowledgeModal({ knowledge, getUrlForKey, onClose, onUpdate }) {
-  // 兼容旧数据：将旧类型映射到新类型
-  const getType = (oldType) => {
-    // 旧类型映射：document/markdown -> variety, web/article/video/xiaohongshu -> care
-    if (oldType === "markdown" || oldType === "document") return "variety";
-    if (oldType === "article" || oldType === "video" || oldType === "xiaohongshu" || oldType === "web") return "care";
-    // 新类型直接返回
-    return oldType || "variety";
-  };
-
-  // 处理来源：如果是预设值，找到对应的key；否则设为custom并填入customSource
-  const getSourceState = (sourceValue) => {
-    if (!sourceValue) return { source: "", customSource: "" };
-    const found = KNOWLEDGE_SOURCES.find(s => s.label === sourceValue);
-    if (found) {
-      return { source: found.key, customSource: "" };
-    }
-    return { source: "custom", customSource: sourceValue };
-  };
-
-  const [type, setType] = useState(getType(knowledge.type));
+export function EditVarietyKnowledgeModal({ knowledge, varietyName, getUrlForKey, onClose, onUpdate }) {
+  const [type, setType] = useState(knowledge.type || "care");
   const [title, setTitle] = useState(knowledge.title || "");
   const [content, setContent] = useState(knowledge.content || "");
   const [url, setUrl] = useState(knowledge.url || "");
   const [tags, setTags] = useState(knowledge.tags || []);
-  const sourceState = getSourceState(knowledge.source || "");
+  const sourceState = (() => {
+    if (!knowledge.source) return { source: "", customSource: "" };
+    const found = KNOWLEDGE_SOURCES.find(s => s.label === knowledge.source);
+    if (found) {
+      return { source: found.key, customSource: "" };
+    }
+    return { source: "custom", customSource: knowledge.source };
+  })();
   const [source, setSource] = useState(sourceState.source);
   const [customSource, setCustomSource] = useState(sourceState.customSource);
+  
   // 兼容旧数据：coverPhotoKey（单个）转为 coverPhotoKeys（数组）
   const getInitialPhotoKeys = () => {
     if (knowledge.coverPhotoKeys && Array.isArray(knowledge.coverPhotoKeys)) {
@@ -124,7 +112,7 @@ export function EditKnowledgeModal({ knowledge, getUrlForKey, onClose, onUpdate 
     const updated = {
       ...knowledge,
       type,
-      title: title.trim(),
+      title: title.trim() || `${varietyName} - 知识`,
       content: content.trim(),
       url: url.trim(),
       tags,
@@ -135,9 +123,8 @@ export function EditKnowledgeModal({ knowledge, getUrlForKey, onClose, onUpdate 
     onUpdate(updated);
   }
 
-
   return (
-    <Modal title="编辑知识" onClose={onClose}>
+    <Modal title={`编辑${varietyName}的知识`} onClose={onClose}>
       <div className="space-y-3 max-h-[70vh] overflow-y-auto">
         <div className="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 p-2 text-xs text-zinc-600 dark:text-zinc-400">
           创建时间：{formatDateTime(knowledge.createdAt)}
@@ -150,11 +137,8 @@ export function EditKnowledgeModal({ knowledge, getUrlForKey, onClose, onUpdate 
             value={type}
             onChange={(e) => setType(e.target.value)}
           >
-            {KNOWLEDGE_TYPES.filter(t => t.key !== "variety").map((t) => (
-              <option key={t.key} value={t.key}>
-                {t.icon} {t.label}
-              </option>
-            ))}
+            <option value="care">💧 种植养护</option>
+            <option value="qa">❓ 小问小答</option>
           </select>
         </div>
 
