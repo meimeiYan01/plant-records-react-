@@ -265,4 +265,3 @@ export function EditVarietyKnowledgeModal({ knowledge, varietyName, getUrlForKey
   );
 }
 
-

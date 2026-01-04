@@ -230,4 +230,3 @@ export function AddVarietyKnowledgeModal({ varietyId, varietyName, getUrlForKey,
   );
 }
 
-

@@ -219,4 +219,3 @@ export function EditPlantVarietyModal({ variety, getUrlForKey, onClose, onUpdate
   );
 }
 
-
