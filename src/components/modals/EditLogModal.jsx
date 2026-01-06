@@ -110,6 +110,7 @@ export function EditLogModal({ log, plants, getUrlForKey, onClose, onUpdate }) {
       weather,
       mood,
       relatedPlants,
+      updatedAt: new Date().toISOString(),
     };
     onUpdate(updated);
   }
@@ -120,6 +121,11 @@ export function EditLogModal({ log, plants, getUrlForKey, onClose, onUpdate }) {
         <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-2 text-xs text-zinc-600">
           创建时间：{formatDateTime(log.date)}
         </div>
+        {log.updatedAt && log.updatedAt !== log.date && (
+          <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-2 text-xs text-zinc-600">
+            最近编辑：{formatDateTime(log.updatedAt)}
+          </div>
+        )}
 
         <div>
           <div className="mb-1 text-xs text-zinc-500">日志类型</div>

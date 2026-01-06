@@ -16,7 +16,7 @@ export { AddVarietyKnowledgeModal } from "./AddVarietyKnowledgeModal";
 export { EditVarietyKnowledgeModal } from "./EditVarietyKnowledgeModal";
 export { SelectVarietyModal } from "./SelectVarietyModal";
 export { DataPanelModal } from "./DataPanelModal";
+export { KnowledgeDataPanelModal } from "./KnowledgeDataPanelModal";
 export { LocationManagerModal } from "./LocationManagerModal";
 export { CameraModal } from "./CameraModal";
 export { AlbumModal } from "./AlbumModal";
-

@@ -1,13 +1,11 @@
-import { useMemo, useState } from "react";
-import { Badge, Button, ImageFromIdb } from "../ui";
-import { formatDateTime } from "../../utils";
-import { ImageViewer } from "../ui/ImageViewer";
+﻿import { useMemo, useState } from "react";
+import { Button, ImageFromIdb } from "../ui";
 
 /**
  * 多肉品种Tab组件
  * 用于管理多肉品种信息，包括科属分类等
  */
-export function PlantVarietyTab({ varieties, getUrlForKey, onAddKnowledge, onEdit, onDelete, openImageViewer, onBack, onVarietyClick }) {
+export function PlantVarietyTab({ varieties, getUrlForKey, onAddKnowledge, onAddVariety, onEdit, onDelete, openImageViewer, onVarietyClick }) {
   const [searchText, setSearchText] = useState("");
   const [filterFamily, setFilterFamily] = useState("all");
   const [filterGenus, setFilterGenus] = useState("all");
@@ -86,14 +84,8 @@ export function PlantVarietyTab({ varieties, getUrlForKey, onAddKnowledge, onEdi
 
   return (
     <div className="space-y-4 pb-20">
-      {/* 头部：返回按钮和搜索 */}
-      <div className="flex items-center justify-between gap-2">
-        <button
-          onClick={onBack}
-          className="flex items-center gap-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700 px-3 py-2 text-sm font-medium transition"
-        >
-          ← 返回
-        </button>
+      {/* 头部：搜索和新增 */}
+      <div className="flex items-center gap-2">
         <div className="flex-1 max-w-md">
           <input
             type="text"
@@ -103,12 +95,14 @@ export function PlantVarietyTab({ varieties, getUrlForKey, onAddKnowledge, onEdi
             onChange={(e) => setSearchText(e.target.value)}
           />
         </div>
-        <button
-          onClick={onAddKnowledge}
-          className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700 px-4 py-2 text-sm font-medium transition"
-        >
-          + 添加知识
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => onAddVariety && onAddVariety()}
+            className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700 px-4 py-2 text-sm font-medium transition"
+          >
+            + 新增品种
+          </button>
+        </div>
       </div>
 
       {/* 筛选：科和属 */}
@@ -273,14 +267,11 @@ function VarietyCard({ variety, getUrlForKey, onEdit, onDelete, handleImageClick
               </p>
             )}
 
-            {/* 创建时间 */}
-            <div className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
-              {formatDateTime(variety.createdAt)}
-            </div>
           </div>
         </div>
       </div>
     </div>
   );
 }
+
 

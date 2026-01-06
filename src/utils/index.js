@@ -56,6 +56,7 @@ export const EXPENSE_TAGS = ["必需品", "升级", "补充", "一次性", "定�
 // 知识类型
 export const KNOWLEDGE_TYPES = [
   { key: "variety", label: "多肉品种", icon: "🌱" },
+  { key: "introduction", label: "品种介绍", icon: "🌿" },
   { key: "care", label: "种植养护", icon: "💧" },
   { key: "qa", label: "小问小答", icon: "❓" },
 ];

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Modal } from "../ui/Modal";
 import { Button } from "../ui/Button";
 import { ImageFromIdb } from "../ui/ImageFromIdb";
-import { saveImageToIdb, deleteImageFromIdb, MAX_IMAGE_BYTES, KNOWLEDGE_TAGS, KNOWLEDGE_SOURCES, uid } from "../../utils";
+import { saveImageToIdb, deleteImageFromIdb, MAX_IMAGE_BYTES, KNOWLEDGE_TYPES, KNOWLEDGE_TAGS, KNOWLEDGE_SOURCES, uid } from "../../utils";
 import { createKnowledge } from "../../services/knowledgeService";
 
 export function AddVarietyKnowledgeModal({ varietyId, varietyName, getUrlForKey, onClose, onCreate }) {
@@ -102,8 +102,11 @@ export function AddVarietyKnowledgeModal({ varietyId, varietyName, getUrlForKey,
             value={type}
             onChange={(e) => setType(e.target.value)}
           >
-            <option value="care">💧 种植养护</option>
-            <option value="qa">❓ 小问小答</option>
+            {KNOWLEDGE_TYPES.filter(t => t.key !== "variety" && t.key !== "introduction").map((t) => (
+              <option key={t.key} value={t.key}>
+                {t.icon} {t.label}
+              </option>
+            ))}
           </select>
         </div>
 

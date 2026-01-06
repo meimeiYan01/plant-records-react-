@@ -1,12 +1,11 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { Button } from "../ui";
-import { uid } from "../../utils";
 
 /**
  * 知识图鉴Tab组件
- * 用于收集和展示多肉知识相关的网站，以卡片墙形式展现
+ * 用于收集和展示多肉知识相关的网站，以卡片墙形式展示
  */
-export function KnowledgeAtlasTab({ websites, onAdd, onEdit, onDelete, onBack }) {
+export function KnowledgeAtlasTab({ websites, onAdd, onEdit, onDelete }) {
   const [searchText, setSearchText] = useState("");
 
   const filteredWebsites = useMemo(() => {
@@ -49,14 +48,8 @@ export function KnowledgeAtlasTab({ websites, onAdd, onEdit, onDelete, onBack })
 
   return (
     <div className="space-y-4 pb-20">
-      {/* 头部：返回按钮和搜索 */}
+      {/* 头部：搜索和新增 */}
       <div className="flex items-center justify-between gap-2">
-        <button
-          onClick={onBack}
-          className="flex items-center gap-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700 px-3 py-2 text-sm font-medium transition"
-        >
-          ← 返回
-        </button>
         <div className="flex-1 max-w-md">
           <input
             type="text"
@@ -105,7 +98,7 @@ function WebsiteCard({ site, getDomain, getFaviconUrl, onEdit, onDelete, handleU
   const faviconUrl = getFaviconUrl(site.url);
 
   return (
-    <div 
+    <div
       className="rounded-2xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 shadow-sm transition hover:shadow-md overflow-hidden flex flex-col cursor-pointer"
       onClick={() => setExpanded(!expanded)}
     >
@@ -134,7 +127,10 @@ function WebsiteCard({ site, getDomain, getFaviconUrl, onEdit, onDelete, handleU
               href={site.url}
               target="_blank"
               rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleUrlClick(site.url);
+              }}
               className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 underline truncate mt-1 block"
             >
               {getDomain(site.url)}
@@ -170,7 +166,7 @@ function WebsiteCard({ site, getDomain, getFaviconUrl, onEdit, onDelete, handleU
           </div>
 
           {/* 操作按钮 - 只在展开时显示 */}
-          <div 
+          <div
             className="p-4 pt-0 flex items-center gap-2 border-t border-zinc-100 dark:border-zinc-700"
             onClick={(e) => e.stopPropagation()}
           >
@@ -200,4 +196,3 @@ function WebsiteCard({ site, getDomain, getFaviconUrl, onEdit, onDelete, handleU
     </div>
   );
 }
-

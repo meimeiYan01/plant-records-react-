@@ -82,6 +82,7 @@ export function AddPlantVarietyModal({ getUrlForKey, onClose, onCreate }) {
       description: description.trim(),
       coverPhotoKeys,
       createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     };
     onCreate(variety);
   }

@@ -353,8 +353,8 @@ function VarietyKnowledgeCard({ knowledge, getUrlForKey, onEdit, onDelete, handl
                 <MarkdownRenderer content={knowledge.content} />
               ) : (
                 <>
-                  <MarkdownRenderer content={contentPreview || knowledge.content.slice(0, 200)} />
-                  {knowledge.content.length > 200 && (
+                  <MarkdownRenderer content={contentPreview || knowledge.content.slice(0, 150)} />
+                  {knowledge.content.length > 150 && (
                     <button
                       onClick={() => setExpanded(!expanded)}
                       className="mt-2 text-xs text-blue-600 dark:text-blue-400 underline hover:text-blue-700 dark:hover:text-blue-300"
@@ -364,7 +364,7 @@ function VarietyKnowledgeCard({ knowledge, getUrlForKey, onEdit, onDelete, handl
                   )}
                 </>
               )}
-              {expanded && knowledge.content.length > 200 && (
+              {expanded && knowledge.content.length > 150 && (
                 <button
                   onClick={() => setExpanded(!expanded)}
                   className="mt-2 text-xs text-blue-600 dark:text-blue-400 underline hover:text-blue-700 dark:hover:text-blue-300"
@@ -384,7 +384,7 @@ function VarietyKnowledgeCard({ knowledge, getUrlForKey, onEdit, onDelete, handl
                   onClick={() => setExpanded(!expanded)}
                   className="ml-1 text-xs text-blue-600 dark:text-blue-400 underline hover:text-blue-700 dark:hover:text-blue-300"
                 >
-                  {expanded ? "收起" : "展开"}
+                  {expanded ? "收起" : "展开全文"}
                 </button>
               )}
             </div>

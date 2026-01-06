@@ -133,6 +133,8 @@ export function AddPlantModal({ locations, onClose, onCreate, album, getUrlForKe
                 name: name.trim(),
                 location,
                 startDate: new Date().toISOString(),
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
                 lastWateredAt: null,
                 coverPhotoKey: coverKey || "",
               })

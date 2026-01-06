@@ -6,6 +6,7 @@ import {
   saveImageToIdb,
   deleteImageFromIdb,
   MAX_IMAGE_BYTES,
+  KNOWLEDGE_TYPES,
   KNOWLEDGE_TAGS,
   KNOWLEDGE_SOURCES,
   formatDateTime,
@@ -129,6 +130,11 @@ export function EditVarietyKnowledgeModal({ knowledge, varietyName, getUrlForKey
         <div className="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 p-2 text-xs text-zinc-600 dark:text-zinc-400">
           创建时间：{formatDateTime(knowledge.createdAt)}
         </div>
+        {knowledge.updatedAt && knowledge.updatedAt !== knowledge.createdAt && (
+          <div className="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 p-2 text-xs text-zinc-600 dark:text-zinc-400">
+            最近编辑：{formatDateTime(knowledge.updatedAt)}
+          </div>
+        )}
 
         <div>
           <div className="mb-1 text-xs text-zinc-500 dark:text-zinc-400">知识类型</div>
@@ -137,8 +143,11 @@ export function EditVarietyKnowledgeModal({ knowledge, varietyName, getUrlForKey
             value={type}
             onChange={(e) => setType(e.target.value)}
           >
-            <option value="care">💧 种植养护</option>
-            <option value="qa">❓ 小问小答</option>
+            {KNOWLEDGE_TYPES.filter(t => t.key !== "variety" && t.key !== "introduction").map((t) => (
+              <option key={t.key} value={t.key}>
+                {t.icon} {t.label}
+              </option>
+            ))}
           </select>
         </div>
 

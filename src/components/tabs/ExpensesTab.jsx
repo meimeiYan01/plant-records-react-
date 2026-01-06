@@ -227,4 +227,3 @@ export function ExpensesTab({ expenses, plants, getUrlForKey, onAdd, onEdit, onD
     </div>
   );
 }
-

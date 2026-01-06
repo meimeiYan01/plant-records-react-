@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import { usePwaInstall, useImageCache, useTheme } from "./hooks";
-import { Badge, Button, ImageFromIdb, ConfirmDialog, ImageViewer, TabBar } from "./components/ui";
+import { Badge, Button, ImageFromIdb, ConfirmDialog, ImageViewer, TabBar, KnowledgeMenuBar } from "./components/ui";
 import {
   AddPlantModal,
   AddEventModal,
@@ -20,11 +20,12 @@ import {
   EditVarietyKnowledgeModal,
   SelectVarietyModal,
   DataPanelModal,
+  KnowledgeDataPanelModal,
   LocationManagerModal,
   CameraModal,
   AlbumModal,
 } from "./components/modals";
-import { LogsTab, ExpensesTab, HomeTab, SettingsTab, PlantDetailTab, PlantsTab, KnowledgeTab, KnowledgeAtlasTab, PlantVarietyTab, PlantVarietyDetailTab, AlbumTab } from "./components/tabs";
+import { LogsTab, ExpensesTab, HomeTab, SettingsTab, PlantDetailTab, PlantsTab, KnowledgeTab, KnowledgeAtlasTab, PlantVarietyTab, PlantVarietyAtlasTab, PlantVarietyDetailTab, AlbumTab } from "./components/tabs";
 import { loadState, saveState, daysSince, formatDateTime, LS_KEY, EVENT_TYPES, extFromMime, uid } from "./utils";
 import { exportBackupZip, importBackupZip } from "./services/backupService";
 import { collectLogImageKeys } from "./services/logService";
@@ -166,6 +167,10 @@ export default function App() {
   const [showEditKnowledge, setShowEditKnowledge] = useState(null); // knowledge id
   const [showKnowledgeAtlas, setShowKnowledgeAtlas] = useState(false);
   const [showPlantVariety, setShowPlantVariety] = useState(false);
+  const [plantVarietyView, setPlantVarietyView] = useState("atlas"); // atlas | manage
+  const [knowledgeView, setKnowledgeView] = useState("atlas"); // atlas | list | knowledgeAtlas | manage
+  const [knowledgeFilterType, setKnowledgeFilterType] = useState("care");
+  const [knowledgeSearchToggle, setKnowledgeSearchToggle] = useState(0);
   const [showPlantVarietyDetail, setShowPlantVarietyDetail] = useState(false);
   const [selectedVarietyId, setSelectedVarietyId] = useState(null);
   const [showAddWebsite, setShowAddWebsite] = useState(false);
@@ -176,6 +181,7 @@ export default function App() {
   const [showAddVarietyKnowledge, setShowAddVarietyKnowledge] = useState(false);
   const [showEditVarietyKnowledge, setShowEditVarietyKnowledge] = useState(null); // variety knowledge id
   const [showDataPanel, setShowDataPanel] = useState(false);
+  const [showKnowledgeDataPanel, setShowKnowledgeDataPanel] = useState(false);
   const [showLocationManager, setShowLocationManager] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
   const [showAlbum, setShowAlbum] = useState(false);
@@ -210,6 +216,47 @@ export default function App() {
   useEffect(() => {
     saveState(state);
   }, [state]);
+
+  // 进入知识页时默认展示多肉图鉴
+  useEffect(() => {
+    if (currentTab !== "knowledge") return;
+    setKnowledgeView("atlas");
+    setShowPlantVarietyDetail(false);
+    setSelectedVarietyId(null);
+  }, [currentTab]);
+
+  function handleKnowledgeMenuChange(value) {
+    setShowPlantVarietyDetail(false);
+    setSelectedVarietyId(null);
+    if (value === "atlas") {
+      setKnowledgeView("atlas");
+      return;
+    }
+    if (value === "knowledgeAtlas") {
+      setKnowledgeView("knowledgeAtlas");
+      return;
+    }
+    if (value === "manage") {
+      setKnowledgeView("manage");
+      return;
+    }
+    if (value === "knowledgeData") {
+      setShowKnowledgeDataPanel(true);
+      return;
+    }
+    if (value.startsWith("type:")) {
+      const nextType = value.slice(5);
+      setKnowledgeFilterType(nextType);
+      setKnowledgeView("list");
+    }
+  }
+
+  function handleKnowledgeSearch() {
+    setShowPlantVarietyDetail(false);
+    setSelectedVarietyId(null);
+    setKnowledgeView("list");
+    setKnowledgeSearchToggle((prev) => prev + 1);
+  }
 
   // 预加载前 12 个封面图
   useEffect(() => {
@@ -757,6 +804,40 @@ export default function App() {
   }
 
   // ZIP 备份处理
+  function mergeById(base = [], incoming = []) {
+    const map = new Map();
+    base.forEach((item) => {
+      if (item?.id) map.set(item.id, item);
+    });
+    incoming.forEach((item) => {
+      if (item?.id) map.set(item.id, item);
+    });
+    return Array.from(map.values());
+  }
+
+  function mergeVarietyKnowledges(current = {}, incoming = {}) {
+    const next = { ...current };
+    Object.entries(incoming).forEach(([varietyId, list]) => {
+      next[varietyId] = mergeById(next[varietyId] || [], Array.isArray(list) ? list : []);
+    });
+    return next;
+  }
+
+  function buildKnowledgeBackupState(stateSnapshot) {
+    return {
+      locations: stateSnapshot.locations || ["南窗", "东窗", "北窗", "补光灯架"],
+      plants: [],
+      events: [],
+      generalLogs: [],
+      expenses: [],
+      knowledges: stateSnapshot.knowledges || [],
+      knowledgeAtlasWebsites: stateSnapshot.knowledgeAtlasWebsites || [],
+      plantVarieties: stateSnapshot.plantVarieties || [],
+      varietyKnowledges: stateSnapshot.varietyKnowledges || {},
+      cameraAlbum: [],
+    };
+  }
+
   async function handleExportZip() {
     await exportBackupZip(state);
   }
@@ -765,6 +846,28 @@ export default function App() {
     const nextState = await importBackupZip(file);
     setState(nextState);
     clearCache(); // 清理缓存，让图片重新按需加载
+  }
+
+  async function handleKnowledgeExportZip() {
+    await exportBackupZip(buildKnowledgeBackupState(state));
+  }
+
+  async function handleKnowledgeImportZip(file) {
+    const imported = await importBackupZip(file);
+    setState((prev) => ({
+      ...prev,
+      knowledges: mergeById(prev.knowledges || [], imported.knowledges || []),
+      knowledgeAtlasWebsites: mergeById(
+        prev.knowledgeAtlasWebsites || [],
+        imported.knowledgeAtlasWebsites || []
+      ),
+      plantVarieties: mergeById(prev.plantVarieties || [], imported.plantVarieties || []),
+      varietyKnowledges: mergeVarietyKnowledges(
+        prev.varietyKnowledges || {},
+        imported.varietyKnowledges || {}
+      ),
+    }));
+    clearCache();
   }
 
   return (
@@ -893,6 +996,15 @@ export default function App() {
           />
         )}
 
+        {currentTab === "knowledge" && (
+          <KnowledgeMenuBar
+            currentView={knowledgeView}
+            currentType={knowledgeFilterType}
+            onSelect={handleKnowledgeMenuChange}
+            onSearch={handleKnowledgeSearch}
+          />
+        )}
+
         {currentTab === "expenses" && (
           <ExpensesTab
             expenses={state.expenses || []}
@@ -911,7 +1023,7 @@ export default function App() {
           />
         )}
 
-        {currentTab === "knowledge" && !showKnowledgeAtlas && !showPlantVariety && (
+        {currentTab === "knowledge" && knowledgeView === "list" && !showPlantVarietyDetail && (
           <KnowledgeTab
             knowledges={state.knowledges || []}
             getUrlForKey={getUrlForKey}
@@ -925,12 +1037,16 @@ export default function App() {
               })
             }
             openImageViewer={openImageViewer}
-            onOpenAtlas={() => setShowKnowledgeAtlas(true)}
-            onOpenVariety={() => setShowPlantVariety(true)}
+            activeType={knowledgeFilterType}
+            searchToggleToken={knowledgeSearchToggle}
+            onOpenVarietyDetail={(id) => {
+              setSelectedVarietyId(id);
+              setShowPlantVarietyDetail(true);
+            }}
           />
         )}
 
-        {currentTab === "knowledge" && showKnowledgeAtlas && (
+        {currentTab === "knowledge" && knowledgeView === "knowledgeAtlas" && !showPlantVarietyDetail && (
           <KnowledgeAtlasTab
             websites={state.knowledgeAtlasWebsites || []}
             onAdd={() => setShowAddWebsite(true)}
@@ -942,15 +1058,26 @@ export default function App() {
                 name: state.knowledgeAtlasWebsites?.find((w) => w.id === id)?.name || "网站",
               })
             }
-            onBack={() => setShowKnowledgeAtlas(false)}
           />
         )}
 
-        {currentTab === "knowledge" && showPlantVariety && !showPlantVarietyDetail && (
+        {currentTab === "knowledge" && knowledgeView === "atlas" && !showPlantVarietyDetail && (
+          <PlantVarietyAtlasTab
+            varieties={state.plantVarieties || []}
+            getUrlForKey={getUrlForKey}
+            onVarietyClick={(id) => {
+              setSelectedVarietyId(id);
+              setShowPlantVarietyDetail(true);
+            }}
+          />
+        )}
+
+        {currentTab === "knowledge" && knowledgeView === "manage" && !showPlantVarietyDetail && (
           <PlantVarietyTab
             varieties={state.plantVarieties || []}
             getUrlForKey={getUrlForKey}
             onAddKnowledge={() => setShowSelectVariety(true)}
+            onAddVariety={() => setShowAddPlantVariety(true)}
             onEdit={(id) => setShowEditPlantVariety(id)}
             onDelete={(id) =>
               setDeleteConfirm({
@@ -960,7 +1087,6 @@ export default function App() {
               })
             }
             openImageViewer={openImageViewer}
-            onBack={() => setShowPlantVariety(false)}
             onVarietyClick={(id) => {
               setSelectedVarietyId(id);
               setShowPlantVarietyDetail(true);
@@ -968,7 +1094,7 @@ export default function App() {
           />
         )}
 
-        {currentTab === "knowledge" && showPlantVariety && showPlantVarietyDetail && selectedVarietyId && (
+        {currentTab === "knowledge" && showPlantVarietyDetail && selectedVarietyId && (
           <PlantVarietyDetailTab
             variety={state.plantVarieties?.find((v) => v.id === selectedVarietyId)}
             knowledges={state.varietyKnowledges?.[selectedVarietyId] || []}
@@ -1104,6 +1230,14 @@ export default function App() {
           onReset={resetAll}
           onExportZip={handleExportZip}
           onImportZip={handleImportZip}
+        />
+      )}
+
+      {showKnowledgeDataPanel && (
+        <KnowledgeDataPanelModal
+          onClose={() => setShowKnowledgeDataPanel(false)}
+          onExportZip={handleKnowledgeExportZip}
+          onImportZip={handleKnowledgeImportZip}
         />
       )}
 

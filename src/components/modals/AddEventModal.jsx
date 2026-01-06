@@ -160,6 +160,8 @@ export function AddEventModal({ plant, getUrlForKey, onClose, onCreate }) {
                 plantId: plant.id,
                 type,
                 at: new Date().toISOString(),
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
                 tags,
                 note: note.trim(),
                 photoKeys: photoKeys,

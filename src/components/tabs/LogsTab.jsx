@@ -432,7 +432,7 @@ function LogCard({ log, plants, getPlantNames, getUrlForKey, onEdit, onDelete, o
                   onClick={() => setExpanded(!expanded)}
                   className="ml-1 text-xs text-zinc-500 dark:text-zinc-400 underline hover:text-zinc-700 dark:hover:text-zinc-300"
                 >
-                  {expanded ? "收起" : "展开"}
+                  {expanded ? "收起" : "展开全文"}
                 </button>
               )}
             </div>

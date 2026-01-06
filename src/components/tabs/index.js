@@ -7,6 +7,6 @@ export { PlantsTab } from "./PlantsTab";
 export { KnowledgeTab } from "./KnowledgeTab";
 export { KnowledgeAtlasTab } from "./KnowledgeAtlasTab";
 export { PlantVarietyTab } from "./PlantVarietyTab";
+export { PlantVarietyAtlasTab } from "./PlantVarietyAtlasTab";
 export { PlantVarietyDetailTab } from "./PlantVarietyDetailTab";
 export { AlbumTab } from "./AlbumTab";
-

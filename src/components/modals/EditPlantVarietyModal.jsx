@@ -109,6 +109,11 @@ export function EditPlantVarietyModal({ variety, getUrlForKey, onClose, onUpdate
         <div className="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 p-2 text-xs text-zinc-600 dark:text-zinc-400">
           创建时间：{formatDateTime(variety.createdAt)}
         </div>
+        {variety.updatedAt && variety.updatedAt !== variety.createdAt && (
+          <div className="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 p-2 text-xs text-zinc-600 dark:text-zinc-400">
+            最近编辑：{formatDateTime(variety.updatedAt)}
+          </div>
+        )}
 
         <div>
           <div className="mb-1 text-xs text-zinc-500 dark:text-zinc-400">品种名称 *</div>

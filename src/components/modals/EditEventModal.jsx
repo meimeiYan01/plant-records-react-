@@ -85,6 +85,7 @@ export function EditEventModal({ event, plant, getUrlForKey, onClose, onUpdate }
       tags,
       note: note.trim(),
       photoKeys: photoKeys,
+      updatedAt: new Date().toISOString(),
     };
     
     onUpdate(updated);

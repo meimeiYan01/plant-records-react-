@@ -14,6 +14,8 @@ export function createExpense(expense) {
     amount: expense.amount || 0,
     currency: expense.currency || "CNY",
     date: expense.date || new Date().toISOString(),
+    createdAt: expense.createdAt || expense.date || new Date().toISOString(),
+    updatedAt: expense.updatedAt || expense.date || new Date().toISOString(),
     description: expense.description || "",
     relatedPlantId: expense.relatedPlantId || "",
     photos: expense.photos || [],

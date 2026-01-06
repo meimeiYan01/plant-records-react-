@@ -103,7 +103,7 @@ export function AddKnowledgeModal({ getUrlForKey, onClose, onCreate }) {
             value={type}
             onChange={(e) => setType(e.target.value)}
           >
-            {KNOWLEDGE_TYPES.filter(t => t.key !== "variety").map((t) => (
+            {KNOWLEDGE_TYPES.filter(t => t.key !== "variety" && t.key !== "introduction").map((t) => (
               <option key={t.key} value={t.key}>
                 {t.icon} {t.label}
               </option>

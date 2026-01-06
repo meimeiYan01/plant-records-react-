@@ -105,6 +105,7 @@ export function EditExpenseModal({ expense, plants, getUrlForKey, onClose, onUpd
       relatedPlantId: relatedPlantId || "",
       photos: photoKeys,
       tags,
+      updatedAt: new Date().toISOString(),
     };
     onUpdate(updated);
   }

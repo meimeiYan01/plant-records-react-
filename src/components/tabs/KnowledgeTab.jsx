@@ -1,18 +1,38 @@
-import { useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { Badge, Button, ImageFromIdb } from "../ui";
-import { formatDateTime, formatDate, KNOWLEDGE_TYPES } from "../../utils";
-import { ImageViewer } from "../ui/ImageViewer";
+import { formatDate, KNOWLEDGE_TYPES } from "../../utils";
 import { AdvancedFilter } from "../ui/AdvancedFilter";
 import { MarkdownRenderer } from "../ui/MarkdownRenderer";
 
-export function KnowledgeTab({ knowledges, getUrlForKey, onAdd, onEdit, onDelete, openImageViewer, onOpenAtlas, onOpenVariety }) {
+export function KnowledgeTab({
+  knowledges,
+  getUrlForKey,
+  onAdd,
+  onEdit,
+  onDelete,
+  openImageViewer,
+  activeType,
+  searchToggleToken,
+}) {
   // 默认选择第一个非variety的类型（因为variety已经迁移到多肉品种Tab）
   const defaultType = KNOWLEDGE_TYPES.find(t => t.key !== "variety")?.key || KNOWLEDGE_TYPES[0]?.key || "care";
-  const [filterType, setFilterType] = useState(defaultType);
+  const [filterType, setFilterType] = useState(activeType || defaultType);
   const [searchText, setSearchText] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const [showAdvancedFilter, setShowAdvancedFilter] = useState(false);
   const [advancedFilters, setAdvancedFilters] = useState({});
+
+  useEffect(() => {
+    if (activeType) {
+      setFilterType(activeType);
+    }
+  }, [activeType]);
+
+  useEffect(() => {
+    if (searchToggleToken == null) return;
+    setShowSearch((prev) => !prev);
+    setShowAdvancedFilter(false);
+  }, [searchToggleToken]);
 
   // 获取所有使用的标签
   const allTags = useMemo(() => {
@@ -111,50 +131,16 @@ export function KnowledgeTab({ knowledges, getUrlForKey, onAdd, onEdit, onDelete
       {/* 筛选和搜索 */}
       <div className="space-y-2">
         <div className="flex items-center gap-2">
-          <div className="flex flex-1 gap-2 overflow-x-auto">
-            {KNOWLEDGE_TYPES.filter(t => t.key !== "variety").map((t) => (
-              <button
-                key={t.key}
-                onClick={() => setFilterType(t.key)}
-                className={`shrink-0 rounded-full border px-3 py-1 text-xs transition ${
-                  filterType === t.key
-                    ? "border-zinc-900 dark:border-zinc-600 bg-zinc-900 dark:bg-zinc-700 text-white dark:text-zinc-100"
-                    : "border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700"
-                }`}
-              >
-                {t.icon} {t.label}
-              </button>
-            ))}
-            {/* 多肉品种按钮 */}
-            <button
-              onClick={onOpenVariety}
-              className="shrink-0 rounded-full border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700 px-3 py-1 text-xs transition"
-            >
-              🌱 多肉品种
-            </button>
-            {/* 知识图鉴按钮 */}
-            <button
-              onClick={onOpenAtlas}
-              className="shrink-0 rounded-full border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700 px-3 py-1 text-xs transition"
-            >
-              📖 知识图鉴
-            </button>
-          </div>
           <button
-            onClick={() => {
-              setShowSearch(!showSearch);
-              if (!showSearch) {
-                setShowAdvancedFilter(false);
-              }
-            }}
-            className={`shrink-0 rounded-lg border px-3 py-1 text-xs transition ${
-              showSearch || searchText.trim() || hasActiveFilters
+            onClick={() => setShowAdvancedFilter(true)}
+            className={`rounded-lg border px-3 py-1 text-xs transition ${
+              hasActiveFilters
                 ? "border-zinc-900 dark:border-zinc-600 bg-zinc-900 dark:bg-zinc-700 text-white dark:text-zinc-100"
                 : "border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700"
             }`}
-            title="搜索"
+            title="筛选"
           >
-            🔍
+            筛选
           </button>
         </div>
 
@@ -332,7 +318,6 @@ function KnowledgeCard({ knowledge, getUrlForKey, onEdit, onDelete, handleImageC
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <div className="flex items-center gap-2 flex-wrap">
               <Badge>{displayType ? `${displayType.icon} ${displayType.label}` : "知识"}</Badge>
-              <span className="text-xs text-zinc-500 dark:text-zinc-400">{formatDateTime(knowledge.createdAt)}</span>
               {photoKeys.length > 0 && !hasUrl && (
                 <span className="text-xs text-zinc-400 dark:text-zinc-500">📷 {photoKeys.length > 1 ? photoKeys.length : ""}</span>
               )}
@@ -363,8 +348,8 @@ function KnowledgeCard({ knowledge, getUrlForKey, onEdit, onDelete, handleImageC
                   <MarkdownRenderer content={knowledge.content} />
                 ) : (
                   <>
-                    <MarkdownRenderer content={contentPreview || knowledge.content.slice(0, 200)} />
-                    {knowledge.content.length > 200 && (
+                    <MarkdownRenderer content={contentPreview || knowledge.content.slice(0, 150)} />
+                    {knowledge.content.length > 150 && (
                       <button
                         onClick={() => setExpanded(!expanded)}
                         className="mt-2 text-xs text-blue-600 dark:text-blue-400 underline hover:text-blue-700 dark:hover:text-blue-300"
@@ -374,7 +359,7 @@ function KnowledgeCard({ knowledge, getUrlForKey, onEdit, onDelete, handleImageC
                     )}
                   </>
                 )}
-                {expanded && knowledge.content.length > 200 && (
+                {expanded && knowledge.content.length > 150 && (
                   <button
                     onClick={() => setExpanded(!expanded)}
                     className="mt-2 text-xs text-blue-600 dark:text-blue-400 underline hover:text-blue-700 dark:hover:text-blue-300"
@@ -473,4 +458,3 @@ function KnowledgeCard({ knowledge, getUrlForKey, onEdit, onDelete, handleImageC
     </div>
   );
 }
-

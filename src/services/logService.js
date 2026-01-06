@@ -38,6 +38,8 @@ export function createLog(log) {
     title: log.title || "",
     content: log.content || "",
     date: log.date || new Date().toISOString(),
+    createdAt: log.createdAt || log.date || new Date().toISOString(),
+    updatedAt: log.updatedAt || log.date || new Date().toISOString(),
     tags: log.tags || [],
     photos: log.photos || [],
     weather: weather,
